@@ -21,6 +21,11 @@ class HDrezkaProvider : MainAPI() {
     }
 
     override var mainUrl = "https://rezka.ag"
+
+    private val mirrors = listOf(
+        "https://rezka.ag",
+        "https://rezka-ua.co"
+    )
     override var name = "HDrezka"
     override val hasMainPage = true
     override var lang = "ru"
@@ -138,13 +143,15 @@ class HDrezkaProvider : MainAPI() {
             val translators = document.select("ul#translators-list li")
             if (translators.isNotEmpty()) {
                 translators.map { res ->
+                    val link = res.selectFirst("a")?.attr("href")
                     server.add(
                         mapOf(
                             "translator_name" to res.text(),
                             "translator_id" to res.attr("data-translator_id"),
+                            "translator_url" to (if (link != null) fixUrl(link) else null)
                         )
-                    )
-                }
+                     )
+                 }
             } else {
                 // Extracts the default translator_id from the init script if translation list is missing
                 document.select("script").map { script ->
@@ -344,55 +351,76 @@ class HDrezkaProvider : MainAPI() {
     ): Boolean {
 
         tryParseJson<Data>(data)?.let { res ->
-            if (res.server?.isEmpty() == true) {
-                val document = app.get(res.ref ?: return@let).document
-                document.select("script").map { script ->
-                    if (script.data().contains("sof.tv.initCDNMoviesEvents(")) {
-                        val dataJson =
-                            script.data().substringAfter("false, {").substringBefore("});")
-                        tryParseJson<LocalSources>("{$dataJson}")?.let { source ->
+
+            res.server?.map { server ->
+
+                try {
+
+                // якщо є сторінка перекладача
+                    if (server.translator_url != null) {
+
+                        val doc = app.get(server.translator_url).document
+
+                        doc.select("script").forEach { script ->
+
+                             if (script.data().contains("sof.tv.initCDNSeriesEvents")) {
+
+                                val dataJson =
+                                    script.data().substringAfter("false, {")
+                                        .substringBefore("});")
+
+                                tryParseJson<LocalSources>("{$dataJson}")?.let { source ->
+
+                                    invokeSources(
+                                        server.translator_name ?: "Rezka",
+                                        source.streams,
+                                        source.subtitle.toString(),
+                                        subtitleCallback,
+                                        callback
+                                    )
+
+                                }
+                            }
+                        }
+
+                    } else {
+
+                    // стандартний rezka API
+                        app.post(
+                            url = "$mainUrl/ajax/get_cdn_series/?t=${Date().time}",
+                            data = mapOf(
+                                "id" to res.id,
+                                "translator_id" to server.translator_id,
+                                "favs" to res.favs,
+                                "season" to res.season,
+                                "episode" to res.episode,
+                                "action" to res.action
+                            ).filterValues { it != null }.mapValues { it.value as String },
+                            referer = res.ref
+                        ).parsedSafe<Sources>()?.let { source ->
+
                             invokeSources(
-                                this.name,
-                                source.streams,
+                                server.translator_name ?: "Rezka",
+                                source.url,
                                 source.subtitle.toString(),
                                 subtitleCallback,
                                 callback
                             )
+
                         }
+
                     }
+
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-            } else {
-                res.server?.map { server ->
-                    app.post(
-                        url = "$mainUrl/ajax/get_cdn_series/?t=${Date().time}",
-                        data = mapOf(
-                            "id" to res.id,
-                            "translator_id" to server.translator_id,
-                            "favs" to res.favs,
-                            "is_camrip" to server.camrip,
-                            "is_ads" to server.ads,
-                            "is_director" to server.director,
-                            "season" to res.season,
-                            "episode" to res.episode,
-                            "action" to res.action,
-                        ).filterValues { it != null }.mapValues { it.value as String },
-                        referer = res.ref
-                    ).parsedSafe<Sources>()?.let { source ->
-                        invokeSources(
-                            server.translator_name.toString(),
-                            source.url,
-                            source.subtitle.toString(),
-                            subtitleCallback,
-                            callback
-                        )
-                    }
-                }
+
             }
+
         }
 
         return true
     }
-
     data class LocalSources(
         @JsonProperty("streams") val streams: String,
         @JsonProperty("subtitle") val subtitle: Any?,
@@ -406,11 +434,11 @@ class HDrezkaProvider : MainAPI() {
     data class Server(
         @JsonProperty("translator_name") val translator_name: String?,
         @JsonProperty("translator_id") val translator_id: String?,
+        @JsonProperty("translator_url") val translator_url: String?,
         @JsonProperty("camrip") val camrip: String?,
         @JsonProperty("ads") val ads: String?,
         @JsonProperty("director") val director: String?,
     )
-
     data class Data(
         @JsonProperty("id") val id: String?,
         @JsonProperty("favs") val favs: String?,
