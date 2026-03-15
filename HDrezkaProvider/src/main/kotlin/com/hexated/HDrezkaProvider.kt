@@ -421,6 +421,7 @@ class HDrezkaProvider : MainAPI() {
 
         return true
     }
+    
     data class LocalSources(
         @JsonProperty("streams") val streams: String,
         @JsonProperty("subtitle") val subtitle: Any?,
