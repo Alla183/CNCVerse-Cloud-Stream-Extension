@@ -146,11 +146,11 @@ class HDrezkaProvider : MainAPI() {
                     val link = res.selectFirst("a")?.attr("href")
                     server.add(
                         mapOf(
-                            "translator_name" to res.text(),
-                            "translator_id" to res.attr("data-translator_id"),
-                            "translator_url" to (if (link != null) fixUrl(link) else null)
+                           "translator_name" to res.text(),
+                           "translator_id" to res.attr("data-translator_id"),
+                           "translator_url" to (link?.let { fixUrl(it) } ?: "")
                         )
-                     )
+                    )
                  }
             } else {
                 // Extracts the default translator_id from the init script if translation list is missing
@@ -357,7 +357,7 @@ class HDrezkaProvider : MainAPI() {
                 try {
 
                 // якщо є сторінка перекладача
-                    if (server.translator_url != null) {
+                    if (!server.translator_url.isNullOrBlank()) {
 
                         val doc = app.get(server.translator_url).document
 
