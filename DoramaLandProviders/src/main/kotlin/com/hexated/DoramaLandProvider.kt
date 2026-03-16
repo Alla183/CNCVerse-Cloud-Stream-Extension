@@ -94,27 +94,35 @@ class DoramaLandProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        callback.invoke(
-            newExtractorLink(
-                "DoramaLand",
-                "Test Voice",
-                "https://s1.jaswish.com/hls/stream/serials/otomshhyonnaya_lyubov_s1e24_ozvuchka__strannye_miry_436480/hls/index.m3u8",
-                ExtractorLinkType.M3U8
-            ) {
-                this.referer = "https://dorama.land/"
-            }
-        )
+        val doc = app.get(data).document
+        val players = doc.select(".tabs-list__item")
 
-        callback.invoke(
-            newExtractorLink(
-                "DoramaLand",
-                "Test Subtitles",
-                "https://s1.jaswish.com/hls/stream/serials/otomshhyonnaya_lyubov_s1e24_subtitles__strannye_miry_436480/hls/index.m3u8",
-                ExtractorLinkType.M3U8
-            ) {
-                this.referer = "https://dorama.land/"
+       players.forEach { player ->
+
+            val name = player.selectFirst("h3")?.text()?.replace("Озвучка ", "") ?: "Voice"
+
+            val iframeUrl = fixUrl(player.attr("data-url-player"))
+
+            val iframePage = app.get(iframeUrl).text
+
+            val m3u8 = Regex("""https://s\d+\.jaswish\.com/hls/stream/serials/[^\s"']+index\.m3u8""")
+                .find(iframePage)
+                ?.value
+
+            if (m3u8 != null) {
+
+                callback.invoke(
+                    newExtractorLink(
+                        "DoramaLand",
+                        name,
+                        m3u8,
+                        ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = "https://dorama.land/"
+                    }
+                )
             }
-        )
+        }
 
         return true
     }
