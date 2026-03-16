@@ -1,10 +1,9 @@
 package com.hexated
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
+import org.json.JSONObject
 
 class DoramaLandProvider : MainAPI() {
 
@@ -38,16 +37,6 @@ class DoramaLandProvider : MainAPI() {
         return newHomePageResponse(request.name, home)
     }
 
-    private fun Element.toSearchResult(): SearchResponse {
-        val title = this.selectFirst(".poster-item__title")?.text() ?: "No title"
-        val href = fixUrl(this.selectFirst("a")?.attr("href") ?: "")
-        val poster = fixUrlNull(this.selectFirst("img")?.attr("src"))
-
-        return newTvSeriesSearchResponse(title, href, TvType.AsianDrama) {
-            this.posterUrl = poster
-        }
-    }
-
     override suspend fun search(query: String): List<SearchResponse> {
         val doc = app.get("$mainUrl/search?q=$query").document
 
@@ -75,7 +64,9 @@ class DoramaLandProvider : MainAPI() {
             .mapNotNull { ep ->
                 val href = ep.selectFirst("a")?.attr("href") ?: return@mapNotNull null
                 val name = ep.selectFirst(".short-cinematic__episode-number")?.text()
-                val episode = Regex("(\\d+)").find(name ?: "")?.groupValues?.getOrNull(1)?.toIntOrNull()
+
+                val episode = Regex("(\\d+)").find(name ?: "")
+                    ?.groupValues?.getOrNull(1)?.toIntOrNull()
 
                 newEpisode(fixUrl(href)) {
                     this.name = name
@@ -89,54 +80,56 @@ class DoramaLandProvider : MainAPI() {
         }
     }
 
-override suspend fun loadLinks(
-    data: String,
-    isCasting: Boolean,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-): Boolean {
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
 
-    val doc = app.get(data).document
-    val json = doc.selectFirst("#inputData")?.attr("value") ?: return false
+        val doc = app.get(data).document
 
-    val voices = Regex(
-        """"video_id":"(\d+)".*?"voice_name":"([^"]+)".*?"voice_tag":"([^"]+)""""
-    ).findAll(json)
+        val jsonText = doc.selectFirst("#inputData")?.html() ?: return false
 
-    voices.forEach { match ->
+        val episodeNumber = Regex("(\\d+)-seriya")
+            .find(data)
+            ?.groupValues?.getOrNull(1)
+            ?: return false
 
-        val videoId = match.groupValues[1]
-        val voiceName = match.groupValues[2]
-        val voiceTag = match.groupValues[3]
+        val json = JSONObject(jsonText)
 
-        val apiUrl = "https://a.jaswish.com/api/source/$videoId?voice=$voiceTag"
+        val season = json.getJSONObject("1")
 
-        val apiResponse = app.get(
-            apiUrl,
-            headers = mapOf(
-                "Referer" to mainUrl,
-                "Origin" to "https://a.jaswish.com"
-            )
-        ).text
+        if (!season.has(episodeNumber)) return false
 
-        val m3u8 = Regex("""https?://[^"]+\.m3u8""")
-            .find(apiResponse)
-            ?.value
+        val voices = season.getJSONArray(episodeNumber)
 
-        if (m3u8 != null) {
+        for (i in 0 until voices.length()) {
 
-            callback.invoke(
-                newExtractorLink(
-                    "DoramaLand",
-                    voiceName,
-                    m3u8
-                ) {
-                    referer = "https://a.jaswish.com/"
-                }
-            )
+            val item = voices.getJSONObject(i)
+
+            val videoId = item.getString("video_id")
+            val voiceName = item.getString("voice_name")
+            val voiceTag = item.getString("voice_tag")
+
+            for (server in 1..5) {
+
+                val m3u8 =
+                    "https://s$server.jaswish.com/hls/$videoId/$voiceTag/index.m3u8"
+
+                callback.invoke(
+                    newExtractorLink(
+                        "DoramaLand",
+                        voiceName,
+                        m3u8,
+                        ExtractorLinkType.M3U8
+                    ) {
+                        referer = "https://a.jaswish.com/"
+                    }
+                )
+            }
         }
-    }
 
-    return true
-}
+        return true
+    }
 }
