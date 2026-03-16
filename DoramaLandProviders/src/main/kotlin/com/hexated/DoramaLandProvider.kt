@@ -53,7 +53,7 @@ class DoramaLandProvider : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(
-            data,
+            url,
             headers = mapOf(
                 "User-Agent" to "Mozilla/5.0",
                 "Referer" to mainUrl
