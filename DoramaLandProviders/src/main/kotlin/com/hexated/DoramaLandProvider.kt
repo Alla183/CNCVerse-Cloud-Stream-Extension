@@ -48,14 +48,18 @@ class DoramaLandProvider : MainAPI() {
         }
     }
 
-    override suspend fun search(query: String): List<SearchResponse> {
+   override suspend fun search(query: String): List<SearchResponse> {
+       val doc = app.get("$mainUrl/search?q=$query").document
+       return doc.select(".search-item").map { element ->
+           val title = element.selectFirst(".search-item__title")?.text() ?: "No title"
+           val href = fixUrl(element.selectFirst(".search-item-wrap")?.attr("href") ?: "")
+           val poster = fixUrlNull(element.selectFirst(".search-item-img img")?.attr("src"))
 
-        val doc = app.get("$mainUrl/search?q=$query").document
-
-        return doc.select(".poster-item").map {
-            it.toSearchResult()
-        }
-    }
+           newTvSeriesSearchResponse(title, href, TvType.AsianDrama) {
+               this.posterUrl = poster
+           }
+       }
+   }
 
    override suspend fun load(url: String): LoadResponse {
 
