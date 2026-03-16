@@ -100,20 +100,45 @@ override suspend fun loadLinks(
     callback: (ExtractorLink) -> Unit
 ): Boolean {
 
+    // отримуємо сторінку
     val doc = app.get(data).document
-    val players = doc.select("[data-url-player]")
+
+    // знаходимо ID дорами
+    val newsId = doc.selectFirst("div#dle-content")?.attr("data-news-id")
+        ?: return false
+
+    // робимо AJAX запит як сайт
+    val response = app.post(
+        "$mainUrl/engine/ajax/playlists.php",
+        data = mapOf(
+            "news_id" to newsId,
+            "xfield" to "serial",
+            "action" to "get_player"
+        ),
+        headers = mapOf(
+            "X-Requested-With" to "XMLHttpRequest",
+            "Referer" to data
+        )
+    )
+
+    val ajaxDoc = response.document
+    val players = ajaxDoc.select("[data-url-player]")
 
     players.forEach { player ->
 
         val name = player.text().ifBlank { "Voice" }
-        val iframeUrl = fixUrl(player.attr("data-url-player"))
+        val iframe = fixUrl(player.attr("data-url-player"))
 
-        if (iframeUrl.contains("kodik")) {
-            loadExtractor(iframeUrl, data, subtitleCallback, callback)
-            return@forEach
-        }
+        // Cloudstream сам розпарсить Kodik
+        loadExtractor(
+            iframe,
+            data,
+            subtitleCallback,
+            callback
+        )
     }
 
     return true
 }
+
 }
