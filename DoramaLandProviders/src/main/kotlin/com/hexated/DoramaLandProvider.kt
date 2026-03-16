@@ -1,12 +1,10 @@
-package com.hexated
+package com.hexated  
 
-import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.utils.loadExtractor
-import org.jsoup.nodes.Element
+import com.lagradost.cloudstream3.* 
+import com.lagradost.cloudstream3.utils.ExtractorLink 
+import com.lagradost.cloudstream3.utils.ExtractorLinkType 
+import com.lagradost.cloudstream3.utils.newExtractorLink 
+import org.jsoup.nodes.Element 
 
 
 class DoramaLandProvider : MainAPI() {
@@ -100,42 +98,38 @@ override suspend fun loadLinks(
     callback: (ExtractorLink) -> Unit
 ): Boolean {
 
-    // отримуємо сторінку
     val doc = app.get(data).document
-
-    // знаходимо ID дорами
-    val newsId = doc.selectFirst("div#dle-content")?.attr("data-news-id")
-        ?: return false
-
-    // робимо AJAX запит як сайт
-    val response = app.post(
-        "$mainUrl/engine/ajax/playlists.php",
-        data = mapOf(
-            "news_id" to newsId,
-            "xfield" to "serial",
-            "action" to "get_player"
-        ),
-        headers = mapOf(
-            "X-Requested-With" to "XMLHttpRequest",
-            "Referer" to data
-        )
-    )
-
-    val ajaxDoc = response.document
-    val players = ajaxDoc.select("[data-url-player]")
+    val players = doc.select(".tabs-list__item")
 
     players.forEach { player ->
+        val name = player.selectFirst("h3")?.text() ?: "Voice"
+        val iframeUrl = fixUrl(player.attr("data-url-player"))
 
-        val name = player.text().ifBlank { "Voice" }
-        val iframe = fixUrl(player.attr("data-url-player"))
+        // 1. GET iframe page
+        val iframeDoc = app.get(iframeUrl).document
 
-        // Cloudstream сам розпарсить Kodik
-        loadExtractor(
-            iframe,
-            data,
-            subtitleCallback,
-            callback
-        )
+        // 2. Шукати Master M3U8 у скриптах
+        val scriptText = iframeDoc.select("script").joinToString("\n") { it.html() }
+        val m3u8 = Regex("""https://s\d+\.jaswish\.com[^\s"']+index\.m3u8""")
+            .find(scriptText)
+            ?.value
+
+        if (m3u8 != null) {
+            callback.invoke(
+                newExtractorLink(
+                    "DoramaLand",
+                    name,
+                    m3u8,
+                    ExtractorLinkType.M3U8
+                ) {
+                    this.referer = "https://a.jaswish.com/"
+                    this.headers = mapOf(
+                        "Origin" to "https://a.jaswish.com",
+                        "Referer" to "https://a.jaswish.com/"
+                    )
+                }
+            )
+        }
     }
 
     return true
