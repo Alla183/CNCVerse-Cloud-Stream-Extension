@@ -54,17 +54,35 @@ class DoramaLandProvider : MainAPI() {
         }
     }
 
-    override suspend fun load(url: String): LoadResponse {
+   override suspend fun load(url: String): LoadResponse {
 
-        val doc = app.get(url).document
+       val doc = app.get(url).document
 
-        val title = doc.selectFirst("h1")?.text() ?: "No title"
-        val poster = fixUrlNull(doc.selectFirst(".poster img")?.attr("src"))
-        val description = doc.selectFirst(".description")?.text()
+       val title = doc.selectFirst("h1")?.text() ?: "No title"
+       val poster = fixUrlNull(doc.selectFirst(".poster img")?.attr("src"))
+       val description = doc.selectFirst(".description")?.text()
 
-        return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, emptyList()) {
-            this.posterUrl = poster
-            this.plot = description
-        }
-    }
+    // 🔹 ОТ ТУТ додаємо парсинг епізодів
+       val episodes = doc.select(
+           "div.catalog.serial-list-episodes div.short-cinematic"
+       ).mapNotNull { ep ->
+
+           val href = ep.selectFirst("a")?.attr("href") ?: return@mapNotNull null
+           val name = ep.selectFirst(".short-cinematic__episode-number")?.text()
+
+           val episode =
+               Regex("(\\d+)").find(name ?: "")?.groupValues?.getOrNull(1)?.toIntOrNull()
+
+           newEpisode(fixUrl(href)) {
+               this.name = name
+               this.episode = episode
+           }
+       }
+
+    // 🔹 тут використовуємо episodes
+       return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
+           this.posterUrl = poster
+           this.plot = description
+       }
+ }
 }
