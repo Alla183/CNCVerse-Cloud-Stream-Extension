@@ -52,7 +52,14 @@ class DoramaLandProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val doc = app.get(url).document
+        val doc = app.get(
+            data,
+            headers = mapOf(
+                "User-Agent" to "Mozilla/5.0",
+                "Referer" to mainUrl
+            ),
+            timeout = 30
+        ).document
 
         val title = doc.selectFirst("h1")?.text() ?: "No title"
         val poster = fixUrlNull(doc.selectFirst(".about-serial-poster img")?.attr("src"))
@@ -87,7 +94,14 @@ class DoramaLandProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        val doc = app.get(data).document
+        val doc = app.get(
+            data,
+            headers = mapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+                "Referer" to mainUrl,
+                "Accept" to "text/html"
+            )
+        ).document
 
         val jsonText = doc.selectFirst("#inputData")?.html() ?: return false
 
@@ -125,6 +139,11 @@ class DoramaLandProvider : MainAPI() {
                         ExtractorLinkType.M3U8
                     ) {
                         referer = "https://a.jaswish.com/"
+                        headers = mapOf(
+                            "Origin" to "https://a.jaswish.com",
+                            "Referer" to "https://a.jaswish.com/",
+                            "User-Agent" to "Mozilla/5.0"
+                        )
                     }
                 )
             }
