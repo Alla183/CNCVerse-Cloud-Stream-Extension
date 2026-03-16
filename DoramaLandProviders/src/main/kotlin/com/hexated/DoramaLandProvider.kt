@@ -89,39 +89,49 @@ class DoramaLandProvider : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
+override suspend fun loadLinks(
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
 
-        val doc = app.get(data).document
-        val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return false
-        val iframeUrl = fixUrl(iframeSrc)
+    val doc = app.get(data).document
 
-        // Отримуємо HTML iframe як text
-        val iframeText = app.get(
-            iframeUrl,
-            headers = mapOf("Referer" to mainUrl)
-        ).text
+    val jsonText = doc.selectFirst("#inputData")?.text() ?: return false
 
-        // Шукаємо m3u8 у JS
-        val m3u8 = Regex("""https?://[^"']+\.m3u8""").find(iframeText)?.value
+    val videoId = Regex(""""video_id":"(\d+)"""")
+        .find(jsonText)
+        ?.groupValues?.get(1)
+        ?: return false
 
-        if (m3u8 != null) {
-            callback(
-                newExtractorLink(
-                    "DoramaLand",
-                    "Player",
-                    m3u8,
-                    ExtractorLinkType.M3U8
-                ) {
-                    referer = iframeUrl
-                }
-            )
-        }
+    val voiceTag = Regex(""""voice_tag":"([^"]+)"""")
+        .find(jsonText)
+        ?.groupValues?.get(1)
+        ?: return false
 
-        return true
+    val voiceName = Regex(""""voice_name":"([^"]+)"""")
+        .find(jsonText)
+        ?.groupValues?.get(1)
+        ?: "Voice"
+
+    for (i in 1..5) {
+
+        val m3u8 = "https://s$i.jaswish.com/hls/$videoId/$voiceTag/index.m3u8"
+
+        callback.invoke(
+            newExtractorLink(
+                "DoramaLand",
+                voiceName,
+                m3u8,
+                ExtractorLinkType.M3U8
+            ) {
+                referer = mainUrl
+                quality = Qualities.Unknown.value
+            }
+        )
     }
+
+    return true
+}
 }
