@@ -97,11 +97,45 @@ override suspend fun loadLinks(
 ): Boolean {
 
     val doc = app.get(data).document
+    val json = doc.selectFirst("#inputData")?.text() ?: return false
 
-    val iframe = doc.selectFirst("iframe")?.attr("src") ?: return false
-    val url = fixUrl(iframe)
+    val voices = Regex(
+        """"video_id":"(\d+)".*?"voice_name":"([^"]+)".*?"voice_tag":"([^"]+)""""
+    ).findAll(json)
 
-    loadExtractor(url, data, subtitleCallback, callback)
+    voices.forEach { match ->
+
+        val videoId = match.groupValues[1]
+        val voiceName = match.groupValues[2]
+        val voiceTag = match.groupValues[3]
+
+        val apiUrl = "https://a.jaswish.com/api/source/$videoId?voice=$voiceTag"
+
+        val apiResponse = app.get(
+            apiUrl,
+            headers = mapOf(
+                "Referer" to mainUrl,
+                "Origin" to "https://a.jaswish.com"
+            )
+        ).text
+
+        val m3u8 = Regex("""https?://[^"]+\.m3u8""")
+            .find(apiResponse)
+            ?.value
+
+        if (m3u8 != null) {
+
+            callback.invoke(
+                newExtractorLink(
+                    "DoramaLand",
+                    voiceName,
+                    m3u8
+                ) {
+                    referer = "https://a.jaswish.com/"
+                }
+            )
+        }
+    }
 
     return true
 }
