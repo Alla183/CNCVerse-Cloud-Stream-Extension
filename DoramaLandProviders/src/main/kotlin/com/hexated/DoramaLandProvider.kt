@@ -17,11 +17,11 @@ class DoramaLandProvider : MainAPI() {
         TvType.AsianDrama
     )
 
-    override val hasMainPage = true
+    override val hasMainPage = false
 
-    override val mainPage = mainPageOf(
-        "$mainUrl/doramy/" to "Dorama",
-    )
+    // override val mainPage = mainPageOf(
+    //    "$mainUrl/doramy/" to "Dorama",
+   // )
 
     override suspend fun getMainPage(
         page: Int,
