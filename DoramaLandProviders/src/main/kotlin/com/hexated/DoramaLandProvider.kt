@@ -97,7 +97,7 @@ override suspend fun loadLinks(
 ): Boolean {
 
     val doc = app.get(data).document
-    val json = doc.selectFirst("#inputData")?.text() ?: return false
+    val json = doc.selectFirst("#inputData")?.attr("value") ?: return false
 
     val voices = Regex(
         """"video_id":"(\d+)".*?"voice_name":"([^"]+)".*?"voice_tag":"([^"]+)""""
