@@ -98,24 +98,22 @@ override suspend fun loadLinks(
 ): Boolean {
 
     val doc = app.get(data).document
-
     val players = doc.select(".tabs-list__item")
 
     players.forEach { player ->
-
         val name = player.selectFirst("h3")?.text() ?: "Voice"
+        val iframeUrl = fixUrl(player.attr("data-url-player"))
 
-        val iframe = player.attr("data-url-player")
-        val iframeUrl = fixUrl(iframe)
+        // 1. GET iframe page
+        val iframeDoc = app.get(iframeUrl).document
 
-        val iframePage = app.get(iframeUrl).text
-
+        // 2. Шукати Master M3U8 у скриптах
+        val scriptText = iframeDoc.select("script").joinToString("\n") { it.html() }
         val m3u8 = Regex("""https://s\d+\.jaswish\.com[^\s"']+index\.m3u8""")
-            .find(iframePage)
+            .find(scriptText)
             ?.value
 
         if (m3u8 != null) {
-
             callback.invoke(
                 newExtractorLink(
                     "DoramaLand",
