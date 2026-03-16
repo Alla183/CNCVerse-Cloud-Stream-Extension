@@ -135,7 +135,8 @@ class HDrezkaProvider : MainAPI() {
         data["ref"] = url
 
         return if (tvType == TvType.TvSeries) {
-            val translators = document.select("#translators-list a")
+            // Забираємо всі li та a всередині ul#translators-list
+            val translators = document.select("#translators-list li, #translators-list a")
             if (translators.isNotEmpty()) {
                 translators.map { res ->
                     server.add(
