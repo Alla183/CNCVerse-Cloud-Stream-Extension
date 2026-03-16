@@ -1,10 +1,13 @@
 package com.hexated
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
+
 
 class DoramaLandProvider : MainAPI() {
 
@@ -105,30 +108,9 @@ override suspend fun loadLinks(
         val name = player.text().ifBlank { "Voice" }
         val iframeUrl = fixUrl(player.attr("data-url-player"))
 
-        // Kodik iframe
         if (iframeUrl.contains("kodik")) {
-            loadExtractor(iframeUrl, subtitleCallback, callback)
+            loadExtractor(iframeUrl, data, subtitleCallback, callback)
             return@forEach
-        }
-
-        val iframeDoc = app.get(iframeUrl).document
-        val scriptText = iframeDoc.select("script").joinToString("\n") { it.html() }
-
-        val m3u8 = Regex("""https?:\/\/[^\s"']+\.m3u8""")
-            .find(scriptText)
-            ?.value
-
-        if (m3u8 != null) {
-            callback.invoke(
-                newExtractorLink(
-                    "DoramaLand",
-                    name,
-                    m3u8,
-                    ExtractorLinkType.M3U8
-                ) {
-                    this.referer = iframeUrl
-                }
-            )
         }
     }
 
