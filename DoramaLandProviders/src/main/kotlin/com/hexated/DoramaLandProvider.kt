@@ -22,20 +22,21 @@ override val mainPage = mainPageOf(
     "$mainUrl/all-dramas" to "Усі дорами"
 )
 
-    override suspend fun getMainPage(
-        page: Int,
-        request: MainPageRequest
-    ): HomePageResponse {
+override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+    val doc = app.get("$mainUrl/all-dramas?page=$page").document
 
-        val doc = app.get("${request.data}?page=$page").document
-
-        val home = doc.select(".poster-item").map {
-            it.toSearchResult()
+    val home = doc.select("div.catalog-item.catalog-item_type_poster").map { el ->
+        val title = el.selectFirst("div.catalog-item__title")?.text() ?: "No title"
+        val href = fixUrl(el.selectFirst("a")?.attr("href") ?: "")
+        val poster = fixUrlNull(el.selectFirst("img")?.attr("src"))
+        
+        newTvSeriesSearchResponse(title, href, TvType.AsianDrama) {
+            this.posterUrl = poster
         }
-
-        return newHomePageResponse(request.name, home)
     }
 
+    return newHomePageResponse(request.name, home)
+}
     private fun Element.toSearchResult(): SearchResponse {
 
         val title = this.selectFirst(".poster-item__title")?.text() ?: "No title"
