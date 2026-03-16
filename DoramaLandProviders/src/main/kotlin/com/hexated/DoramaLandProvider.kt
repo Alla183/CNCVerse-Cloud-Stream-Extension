@@ -98,38 +98,33 @@ override suspend fun loadLinks(
 
     val doc = app.get(data).document
 
-    val jsonText = doc.selectFirst("#inputData")?.text() ?: return false
+    val json = doc.selectFirst("#inputData")?.text() ?: return false
 
-    val videoId = Regex(""""video_id":"(\d+)"""")
-        .find(jsonText)
-        ?.groupValues?.get(1)
-        ?: return false
+    val voices = Regex(
+        """"video_id":"(\d+)".*?"voice_name":"([^"]+)".*?"voice_tag":"([^"]+)""""
+    ).findAll(json)
 
-    val voiceTag = Regex(""""voice_tag":"([^"]+)"""")
-        .find(jsonText)
-        ?.groupValues?.get(1)
-        ?: return false
+    voices.forEach { match ->
 
-    val voiceName = Regex(""""voice_name":"([^"]+)"""")
-        .find(jsonText)
-        ?.groupValues?.get(1)
-        ?: "Voice"
+        val videoId = match.groupValues[1]
+        val voiceName = match.groupValues[2]
+        val voiceTag = match.groupValues[3]
 
-    for (i in 1..5) {
+        for (i in 1..5) {
 
-        val m3u8 = "https://s$i.jaswish.com/hls/$videoId/$voiceTag/index.m3u8"
+            val m3u8 = "https://s$i.jaswish.com/hls/$videoId/$voiceTag/index.m3u8"
 
-        callback.invoke(
-            newExtractorLink(
-                "DoramaLand",
-                voiceName,
-                m3u8,
-                ExtractorLinkType.M3U8
-            ) {
-                referer = mainUrl
-                quality = Qualities.Unknown.value
-            }
-        )
+            callback.invoke(
+                newExtractorLink(
+                    "DoramaLand",
+                    voiceName,
+                    m3u8,
+                    ExtractorLinkType.M3U8
+                ) {
+                    referer = mainUrl
+                }
+            )
+        }
     }
 
     return true
