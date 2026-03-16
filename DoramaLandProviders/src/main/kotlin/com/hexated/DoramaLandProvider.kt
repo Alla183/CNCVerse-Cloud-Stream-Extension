@@ -98,18 +98,23 @@ override suspend fun loadLinks(
 ): Boolean {
 
     val doc = app.get(data).document
-    val players = doc.select(".tabs-list__item")
+    val players = doc.select("[data-url-player]")
 
     players.forEach { player ->
-        val name = player.selectFirst("h3")?.text() ?: "Voice"
+
+        val name = player.text().ifBlank { "Voice" }
         val iframeUrl = fixUrl(player.attr("data-url-player"))
 
-        // 1. GET iframe page
-        val iframeDoc = app.get(iframeUrl).document
+        // Kodik iframe
+        if (iframeUrl.contains("kodik")) {
+            loadExtractor(iframeUrl, subtitleCallback, callback)
+            return@forEach
+        }
 
-        // 2. Шукати Master M3U8 у скриптах
+        val iframeDoc = app.get(iframeUrl).document
         val scriptText = iframeDoc.select("script").joinToString("\n") { it.html() }
-        val m3u8 = Regex("""https://s\d+\.jaswish\.com[^\s"']+index\.m3u8""")
+
+        val m3u8 = Regex("""https?:\/\/[^\s"']+\.m3u8""")
             .find(scriptText)
             ?.value
 
@@ -121,11 +126,7 @@ override suspend fun loadLinks(
                     m3u8,
                     ExtractorLinkType.M3U8
                 ) {
-                    this.referer = "https://a.jaswish.com/"
-                    this.headers = mapOf(
-                        "Origin" to "https://a.jaswish.com",
-                        "Referer" to "https://a.jaswish.com/"
-                    )
+                    this.referer = iframeUrl
                 }
             )
         }
