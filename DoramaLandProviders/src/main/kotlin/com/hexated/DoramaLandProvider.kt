@@ -94,60 +94,27 @@ class DoramaLandProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        val doc = app.get(
-            data,
-            headers = mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-                "Referer" to mainUrl,
-                "Accept" to "text/html"
-            )
-        ).document
-
-        val jsonText = doc.selectFirst("#inputData")?.html() ?: return false
-
-        val episodeNumber = Regex("(\\d+)-seriya")
-            .find(data)
-            ?.groupValues?.getOrNull(1)
-            ?: return false
-
-        val json = JSONObject(jsonText)
-
-        val season = json.getJSONObject("1")
-
-        if (!season.has(episodeNumber)) return false
-
-        val voices = season.getJSONArray(episodeNumber)
-
-        for (i in 0 until voices.length()) {
-
-            val item = voices.getJSONObject(i)
-
-            val videoId = item.getString("video_id")
-            val voiceName = item.getString("voice_name")
-            val voiceTag = item.getString("voice_tag")
-
-            for (server in 1..5) {
-
-                val m3u8 =
-                    "https://s$server.jaswish.com/hls/$videoId/$voiceTag/index.m3u8"
-
-                callback.invoke(
-                    newExtractorLink(
-                        "DoramaLand",
-                        voiceName,
-                        m3u8,
-                        ExtractorLinkType.M3U8
-                    ) {
-                        referer = "https://a.jaswish.com/"
-                        headers = mapOf(
-                            "Origin" to "https://a.jaswish.com",
-                            "Referer" to "https://a.jaswish.com/",
-                            "User-Agent" to "Mozilla/5.0"
-                        )
-                    }
-                )
+        callback.invoke(
+            newExtractorLink(
+                "DoramaLand",
+                "Test Voice",
+                "https://s1.jaswish.com/hls/stream/serials/otomshhyonnaya_lyubov_s1e24_ozvuchka__strannye_miry_436480/hls/index.m3u8",
+                ExtractorLinkType.M3U8
+            ) {
+                this.referer = "https://dorama.land/"
             }
-        }
+        )
+
+        callback.invoke(
+            newExtractorLink(
+                "DoramaLand",
+                "Test Subtitles",
+                "https://s1.jaswish.com/hls/stream/serials/otomshhyonnaya_lyubov_s1e24_subtitles__strannye_miry_436480/hls/index.m3u8",
+                ExtractorLinkType.M3U8
+            ) {
+                this.referer = "https://dorama.land/"
+            }
+        )
 
         return true
     }
