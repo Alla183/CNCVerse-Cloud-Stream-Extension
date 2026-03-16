@@ -85,4 +85,46 @@ class DoramaLandProvider : MainAPI() {
            this.plot = description
        }
  }
+
+   override suspend fun loadLinks(
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+
+    val document = app.get(data).document
+
+    val iframe = document.selectFirst("#lazy-player2")?.attr("src")
+        ?: return false
+
+    val iframeUrl = fixUrl(iframe)
+
+    val player = app.get(iframeUrl).text
+
+    val m3u8 = Regex("""https://s\d+\.jaswish\.com[^\s"']+index\.m3u8""")
+        .find(player)
+        ?.value
+
+    if (m3u8 != null) {
+
+        callback.invoke(
+            newExtractorLink(
+                "DoramaLand",
+                "DoramaLand",
+                m3u8,
+                ExtractorLinkType.M3U8
+            ) {
+                this.quality = Qualities.P1080.value
+                this.referer = "https://a.jaswish.com/"
+                this.headers = mapOf(
+                    "Origin" to "https://a.jaswish.com",
+                    "Referer" to "https://a.jaswish.com/"
+                )
+            }
+        )
+    }
+
+    return true
+   }
 }
