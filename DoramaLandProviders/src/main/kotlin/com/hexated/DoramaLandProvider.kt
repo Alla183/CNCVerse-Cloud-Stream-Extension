@@ -97,34 +97,29 @@ override suspend fun loadLinks(
     callback: (ExtractorLink) -> Unit
 ): Boolean {
 
-    val document = app.get(data).document
+    val doc = app.get(data).document
 
-    val episode =
-        Regex("(\\d+)").find(data)?.groupValues?.getOrNull(1) ?: "1"
+    val players = doc.select(".tabs-list__item")
 
-    val voices = document.select("#filterV option")
+    players.forEach { player ->
 
-    voices.forEach { voice ->
+        val name = player.selectFirst("h3")?.text() ?: "Voice"
 
-        val voiceId = voice.attr("value")
-        val voiceName = voice.text()
+        val iframe = player.attr("data-url-player")
+        val iframeUrl = fixUrl(iframe)
 
-        val iframeUrl =
-            "https://a.jaswish.com/pkybuen7l6vw5ars?v=$voiceId&s=$episode"
+        val iframePage = app.get(iframeUrl).text
 
-        val player = app.get(iframeUrl).text
-
-        val m3u8 =
-            Regex("""https://s\d+\.jaswish\.com[^\s"']+index\.m3u8""")
-                .find(player)
-                ?.value
+        val m3u8 = Regex("""https://s\d+\.jaswish\.com[^\s"']+index\.m3u8""")
+            .find(iframePage)
+            ?.value
 
         if (m3u8 != null) {
 
             callback.invoke(
                 newExtractorLink(
                     "DoramaLand",
-                    voiceName,
+                    name,
                     m3u8,
                     ExtractorLinkType.M3U8
                 ) {
@@ -133,6 +128,7 @@ override suspend fun loadLinks(
                         "Origin" to "https://a.jaswish.com",
                         "Referer" to "https://a.jaswish.com/"
                     )
+                    this.quality = Qualities.Unknown.value
                 }
             )
         }
