@@ -128,7 +128,6 @@ override suspend fun loadLinks(
                         "Origin" to "https://a.jaswish.com",
                         "Referer" to "https://a.jaswish.com/"
                     )
-                    this.quality = Qualities.Unknown.value
                 }
             )
         }
