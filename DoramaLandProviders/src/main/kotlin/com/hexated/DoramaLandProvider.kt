@@ -97,31 +97,32 @@ class DoramaLandProvider : MainAPI() {
         val doc = app.get(data).document
         val players = doc.select(".tabs-list__item")
 
-       players.forEach { player ->
+        players.forEach { player ->
 
             val name = player.selectFirst("h3")?.text()?.replace("Озвучка ", "") ?: "Voice"
-
             val iframeUrl = fixUrl(player.attr("data-url-player"))
 
-            val iframePage = app.get(iframeUrl).text
+            val iframePage = app.get(iframeUrl).body.string()
 
-            val m3u8 = Regex("""https://s\d+\.jaswish\.com/hls/stream/serials/[^\s"']+index\.m3u8""")
+            val stream = Regex("""https://s\d+\.jaswish\.com/content/stream/serials/.+?/hls/\d+/index\.m3u8""")
                 .find(iframePage)
                 ?.value
 
-            if (m3u8 != null) {
+            val master = stream?.replace(Regex("/\\d+/index\\.m3u8"), "/index.m3u8")
+
+            if (master != null) {
 
                 callback.invoke(
                     newExtractorLink(
                         "DoramaLand",
                         name,
-                        m3u8,
+                        master,
                         ExtractorLinkType.M3U8
                     ) {
-                        this.referer = "https://dorama.land/"
+                        referer = "https://dorama.land/"
                     }
                 )
-            }
+             }
         }
 
         return true
