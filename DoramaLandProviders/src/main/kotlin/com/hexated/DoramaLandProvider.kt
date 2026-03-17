@@ -109,17 +109,24 @@ class DoramaLandProvider : MainAPI() {
         val dataConfigRaw = playerDiv.attr("data-config")
         if (dataConfigRaw.isNullOrEmpty()) {
             showToast("data-config порожній")
-        return false
-    }
+            return false
+        }
 
 
 
-        val dataConfig = JSONObject(dataConfigRaw)
+        val dataConfig = try {
+            JSONObject(dataConfigRaw)
+        } catch (e: Exception) {
+            showToast("Помилка парсингу data-config")
+            return false
+        }
+
+
         val hls = dataConfig.optString("hls", "")
         if (hls.isEmpty()) {
             showToast("HLS не знайдено")
-        return false
-    }
+            return false
+        }
 
 
 
