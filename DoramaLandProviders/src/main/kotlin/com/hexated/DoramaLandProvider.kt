@@ -52,95 +52,90 @@ class DoramaLandProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val doc = app.get(
-            url,
-            headers = mapOf(
-                "User-Agent" to "Mozilla/5.0",
-                "Referer" to mainUrl
-            ),
-            timeout = 30
-        ).document
+        showToast("LOAD: start")
+
+        val doc = app.get(url).document
+        showToast("LOAD: page loaded")
 
         val title = doc.selectFirst("h1")?.text() ?: "No title"
-
-        val poster = fixUrlNull(
-            doc.selectFirst(".about-serial img, .serial-poster img, img[itemprop=image]")
-                ?.attr("src")
-        )
-
+        val poster = fixUrlNull(doc.selectFirst(".about-serial-poster img")?.attr("src"))
         val description = doc.selectFirst(
-            ".serial-description-text, .spoiler__content[itemprop=description]"
+            ".serial-description-text .spoiler__content[itemprop=description]"
         )?.text()
 
-    // 🔥 ГОЛОВНЕ ВИПРАВЛЕННЯ ТУТ
-        val episodes = doc.select("div.short-cinematic").mapNotNull { el ->
+        val episodes = doc.select("div.catalog.serial-list-episodes div.short-cinematic")
+            .mapNotNull { ep ->
+                val href = ep.selectFirst("a")?.attr("href") ?: return@mapNotNull null
+                val name = ep.selectFirst(".short-cinematic__episode-number")?.text()
 
-            val link = el.selectFirst("> a") ?: return@mapNotNull null
+                val episode = Regex("(\\d+)")
+                    .find(name ?: "")
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.toIntOrNull()
 
-            val href = link.attr("href")
-            if (href.isNullOrEmpty()) return@mapNotNull null
-
-            val name = el.selectFirst(".short-cinematic__episode-number")
-                ?.text()
-                ?: "Episode"
-
-            val episode = Regex("(\\d+)")
-                .find(name)
-                ?.groupValues
-                ?.getOrNull(1)
-                ?.toIntOrNull()
-
-            newEpisode(fixUrl(href)) {
-                this.name = name
-                this.episode = episode
-            }
-        }
-
-            return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
-                this.posterUrl = poster
-                this.plot = description
-            }
-        }
-
-        override suspend fun loadLinks(
-            data: String,
-            isCasting: Boolean,
-            subtitleCallback: (SubtitleFile) -> Unit,
-            callback: (ExtractorLink) -> Unit
-        ): Boolean {
-
-            val doc = app.get(data).document
-            val players = doc.select("[data-url-player]")
-
-            players.forEach { player ->
-
-                val name = player.selectFirst("h3")?.text() ?: "Voice"
-                val iframe = player.attr("data-url-player")
-                val iframeUrl = fixUrl(iframe)
-
-                val iframePage = app.get(iframeUrl).text
-
-                val streamBase = Regex(
-                    """https://s\d+\.jaswish\.com/content/stream/(serials|films)/[^"]+/hls/"""
-                ).find(iframePage)?.value
-
-                if (streamBase != null) {
-
-                    val m3u8 = streamBase + "index.m3u8"
-
-                    callback.invoke(
-                        newExtractorLink(
-                            "DoramaLand",
-                            name,
-                            m3u8,
-                            ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = "https://a.jaswish.com/"
-                        }
-                    )
+                newEpisode(fixUrl(href)) {
+                    this.name = name
+                    this.episode = episode
                 }
             }
 
-            return true
-        }   
+        showToast("LOAD: episodes = ${episodes.size}")
+
+        return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
+            this.posterUrl = poster
+            this.plot = description
+        }
+    }
+    
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+
+        showToast("LINKS: start")
+
+        val doc = app.get(data).document
+        showToast("LINKS: page loaded")
+
+        val player = doc.selectFirst("[data-config]")
+        if (player == null) {
+            showToast("ERROR: data-config NOT FOUND")
+            return false
+        }
+
+        showToast("data-config FOUND")
+
+        val configRaw = player.attr("data-config")
+        val config = org.jsoup.parser.Parser.unescapeEntities(configRaw, false)
+
+        val hls = Regex("\"hls\":\"(.*?)\"")
+            .find(config)
+            ?.groupValues
+            ?.getOrNull(1)
+
+        if (hls == null) {
+            showToast("ERROR: HLS NOT FOUND")
+            return false
+        }
+
+        showToast("HLS FOUND")
+
+        callback.invoke(
+            newExtractorLink(
+                "DoramaLand",
+                "Main",
+                hls,
+                ExtractorLinkType.M3U8
+            ) {
+                this.referer = "https://dorama.land/"
+            }
+        )
+
+        showToast("LINK SENT")
+
+        return true
+    }
 }
