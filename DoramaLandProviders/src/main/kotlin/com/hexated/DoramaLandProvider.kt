@@ -102,22 +102,16 @@ class DoramaLandProvider : MainAPI() {
         showToast("LINKS: page loaded")
 
         val playerDiv = doc.selectFirst("div[id^=videoplayer]")
-        ?: return showToast("Player не знайдено на сторінці")
+            ?: return showToast("Player не знайдено на сторінці")
 
         showToast("data-config FOUND")
 
         val dataConfigRaw = playerDiv.attr("data-config")
         if (dataConfigRaw.isNullOrEmpty()) return showToast("data-config порожній")
 
-        val hls = Regex("\"hls\":\"(.*?)\"")
-            .find(config)
-            ?.groupValues
-            ?.getOrNull(1)
-
-        if (hls == null) {
-            showToast("ERROR: HLS NOT FOUND")
-            return false
-        }
+        val dataConfig = JSONObject(dataConfigRaw)
+        val hls = dataConfig.optString("hls", "")
+        if (hls.isEmpty()) return showToast("HLS не знайдено")
 
         showToast("HLS FOUND")
 
