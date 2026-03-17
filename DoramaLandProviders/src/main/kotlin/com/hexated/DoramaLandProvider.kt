@@ -73,27 +73,30 @@ class DoramaLandProvider : MainAPI() {
         )?.text()
 
     // 🔥 ГОЛОВНЕ ВИПРАВЛЕННЯ ТУТ
-        val episodes = doc.select(".short-cinematic a")
-            .mapNotNull { ep ->
+        val episodes = doc.select("div.short-cinematic").mapNotNull { el ->
 
-                val href = ep.attr("href")
-                if (href.isNullOrEmpty()) return@mapNotNull null
+        val link = el.selectFirst("> a") ?: return@mapNotNull null
 
-                val name = ep.text().ifEmpty { "Episode" }
+        val href = link.attr("href")
+        if (href.isNullOrEmpty()) return@mapNotNull null
 
-                val episode = Regex("(\\d+)")
-                    .find(name)
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    ?.toIntOrNull()
+        val name = el.selectFirst(".short-cinematic__episode-number")
+            ?.text()
+            ?: "Episode"
 
-                newEpisode(fixUrl(href)) {
-                    this.name = name
-                    this.episode = episode
-                }
-            }
+        val episode = Regex("(\\d+)")
+            .find(name)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
 
-        return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
+        newEpisode(fixUrl(href)) {
+            this.name = name
+            this.episode = episode
+        }
+    }
+
+            return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
             this.posterUrl = poster
             this.plot = description
         }
