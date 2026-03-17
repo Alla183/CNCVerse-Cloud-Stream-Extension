@@ -95,16 +95,21 @@ class DoramaLandProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+
         val doc = app.get(data).document
 
-    // Шукаємо div з відеоплеєром
-        val playerDiv = doc.selectFirst("div[id^=videoplayer]")
-        if (playerDiv == null) {
-            showToast("Player не знайдено на сторінці")
-        return false
-    }
+        val iframe = doc.selectFirst("iframe") ?: run {
+            showToast("iframe не знайдено")
+            return false
+        }
 
+        val iframeUrl = fixUrl(iframe.attr("src"))
+        val iframeDoc = app.get(iframeUrl, referer = mainUrl).document
 
+        val playerDiv = iframeDoc.selectFirst("div[id^=videoplayer]") ?: run {
+            showToast("Player не знайдено в iframe")
+            return false
+        }
 
         val dataConfigRaw = playerDiv.attr("data-config")
         if (dataConfigRaw.isNullOrEmpty()) {
@@ -112,23 +117,13 @@ class DoramaLandProvider : MainAPI() {
             return false
         }
 
+        val dataConfig = JSONObject(dataConfigRaw)
+        val hls = dataConfig.optString("hls")
 
-
-        val dataConfig = try {
-            JSONObject(dataConfigRaw)
-        } catch (e: Exception) {
-            showToast("Помилка парсингу data-config")
-            return false
-        }
-
-
-        val hls = dataConfig.optString("hls", "")
-        if (hls.isEmpty()) {
+        if (hls.isNullOrEmpty()) {
             showToast("HLS не знайдено")
             return false
         }
-
-
 
         callback.invoke(
             newExtractorLink(
@@ -137,7 +132,7 @@ class DoramaLandProvider : MainAPI() {
                 hls,
                 ExtractorLinkType.M3U8
             ) {
-                this.referer = mainUrl
+                this.referer = iframeUrl
             }
         )
 
