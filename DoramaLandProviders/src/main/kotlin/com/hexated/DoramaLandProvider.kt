@@ -62,24 +62,39 @@ class DoramaLandProvider : MainAPI() {
         ).document
 
         val title = doc.selectFirst("h1")?.text() ?: "No title"
-        val poster = fixUrlNull(doc.selectFirst(".about-serial-poster img")?.attr("src"))
+
+        val poster = fixUrlNull(
+            doc.selectFirst(".about-serial img, .serial-poster img, img[itemprop=image]")
+                ?.attr("src")
+        )
+
         val description = doc.selectFirst(
-            ".serial-description-text .spoiler__content[itemprop=description]"
+            ".serial-description-text, .spoiler__content[itemprop=description]"
         )?.text()
 
-        val episodes = doc.select("div.catalog.serial-list-episodes div.short-cinematic")
+    // 🔥 ГОЛОВНЕ ВИПРАВЛЕННЯ ТУТ
+        val episodes = doc.select(".short-cinematic a")
             .mapNotNull { ep ->
-                val href = ep.selectFirst("a")?.attr("href") ?: return@mapNotNull null
-                val name = ep.selectFirst(".short-cinematic__episode-number")?.text()
 
-                val episode = Regex("(\\d+)").find(name ?: "")
-                    ?.groupValues?.getOrNull(1)?.toIntOrNull()
+                val href = ep.attr("href")
+                if (href.isNullOrEmpty()) return@mapNotNull null
+
+                val name = ep.text().ifEmpty { "Episode" }
+
+                val episode = Regex("(\\d+)")
+                    .find(name)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.toIntOrNull()
 
                 newEpisode(fixUrl(href)) {
                     this.name = name
                     this.episode = episode
                 }
             }
+
+    // 🔍 лог для перевірки
+        log("Episodes found: ${episodes.size}")
 
         return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
             this.posterUrl = poster
