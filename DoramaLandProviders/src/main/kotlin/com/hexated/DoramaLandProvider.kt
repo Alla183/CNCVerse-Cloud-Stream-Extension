@@ -75,14 +75,16 @@ class DoramaLandProvider : MainAPI() {
 
         val episodes = episodeElements.mapNotNull { ep ->
             val hrefRaw = ep.selectFirst("a")?.attr("href") ?: return@mapNotNull null
-            
+
             val cleanHref = hrefRaw
-                .substringBefore(" ")
+                .replace("\\s+".toRegex(), "")   // 💥 КЛЮЧОВИЙ ФІКС
                 .trim()
-                
+
             val fixed = fixUrl(cleanHref)
-            
+
             println("FIXED CLEAN: $fixed")
+
+
 
             val name = ep.selectFirst(".short-cinematic__episode-number")?.text()
 
