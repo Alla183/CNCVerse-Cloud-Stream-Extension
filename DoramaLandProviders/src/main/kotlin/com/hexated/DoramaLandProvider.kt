@@ -96,6 +96,8 @@ class DoramaLandProvider : MainAPI() {
             newEpisode(fixed) {
                 this.name = name
                 this.episode = episode
+
+                this.data = fixUrl(href)
             }
         }
 
