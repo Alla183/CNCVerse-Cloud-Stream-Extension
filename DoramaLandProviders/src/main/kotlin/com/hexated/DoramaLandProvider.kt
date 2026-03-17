@@ -95,16 +95,11 @@ class DoramaLandProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-
-        showToast("LINKS: start")
-
         val doc = app.get(data).document
-        showToast("LINKS: page loaded")
 
+    // Шукаємо div з відеоплеєром
         val playerDiv = doc.selectFirst("div[id^=videoplayer]")
             ?: return showToast("Player не знайдено на сторінці")
-
-        showToast("data-config FOUND")
 
         val dataConfigRaw = playerDiv.attr("data-config")
         if (dataConfigRaw.isNullOrEmpty()) return showToast("data-config порожній")
@@ -113,8 +108,6 @@ class DoramaLandProvider : MainAPI() {
         val hls = dataConfig.optString("hls", "")
         if (hls.isEmpty()) return showToast("HLS не знайдено")
 
-        showToast("HLS FOUND")
-
         callback.invoke(
             newExtractorLink(
                 "DoramaLand",
@@ -122,11 +115,9 @@ class DoramaLandProvider : MainAPI() {
                 hls,
                 ExtractorLinkType.M3U8
             ) {
-                this.referer = "https://dorama.land/"
+                this.referer = mainUrl
             }
         )
-
-        showToast("LINK SENT")
 
         return true
     }
