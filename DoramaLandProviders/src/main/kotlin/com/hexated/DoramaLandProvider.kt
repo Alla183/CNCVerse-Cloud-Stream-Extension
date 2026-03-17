@@ -101,16 +101,13 @@ class DoramaLandProvider : MainAPI() {
         val doc = app.get(data).document
         showToast("LINKS: page loaded")
 
-        val player = doc.selectFirst("[data-config]")
-        if (player == null) {
-            showToast("ERROR: data-config NOT FOUND")
-            return false
-        }
+        val playerDiv = doc.selectFirst("div[id^=videoplayer]")
+        ?: return showToast("Player не знайдено на сторінці")
 
         showToast("data-config FOUND")
 
-        val configRaw = player.attr("data-config")
-        val config = org.jsoup.parser.Parser.unescapeEntities(configRaw, false)
+        val dataConfigRaw = playerDiv.attr("data-config")
+        if (dataConfigRaw.isNullOrEmpty()) return showToast("data-config порожній")
 
         val hls = Regex("\"hls\":\"(.*?)\"")
             .find(config)
