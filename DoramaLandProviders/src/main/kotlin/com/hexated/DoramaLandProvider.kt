@@ -117,7 +117,8 @@ class DoramaLandProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-
+        log("LOADLINKS CALLED with data = $data")
+        
         val doc = app.get(data).document
 
         val iframe = doc.selectFirst("iframe") ?: run {
