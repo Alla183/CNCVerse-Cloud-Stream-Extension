@@ -55,31 +55,45 @@ class DoramaLandProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         showToast("LOAD: start")
 
-        val doc = app.get(url).document
+        val res = app.get(url)
+        println("FINAL URL: ${res.url}")
+        val doc = res.document
+
         showToast("LOAD: page loaded")
 
         val title = doc.selectFirst("h1")?.text() ?: "No title"
+        println("TITLE: $title")
+
         val poster = fixUrlNull(doc.selectFirst(".about-serial-poster img")?.attr("src"))
+
         val description = doc.selectFirst(
             ".serial-description-text .spoiler__content[itemprop=description]"
         )?.text()
 
-        val episodes = doc.select("div.catalog.serial-list-episodes div.short-cinematic")
-            .mapNotNull { ep ->
-                val href = ep.selectFirst("a")?.attr("href") ?: return@mapNotNull null
-                val name = ep.selectFirst(".short-cinematic__episode-number")?.text()
+        val episodeElements = doc.select(".short-cinematic")
+        println("EP ELEMENTS SIZE: ${episodeElements.size}")
 
-                val episode = Regex("(\\d+)")
-                    .find(name ?: "")
-                    ?.groupValues
-                    ?.getOrNull(1)
-                    ?.toIntOrNull()
+        val episodes = episodeElements.mapNotNull { ep ->
+            val href = ep.selectFirst("a")?.attr("href")
+            println("RAW HREF: $href")
 
-                newEpisode(fixUrl(href)) {
-                    this.name = name
-                    this.episode = episode
-                }
+            if (href.isNullOrEmpty()) return@mapNotNull null
+
+            val fixed = fixUrl(href)
+            println("FIXED HREF: $fixed")
+
+            val name = ep.selectFirst(".short-cinematic__episode-number")?.text()
+
+            val episode = Regex("(\\d+)")
+                .find(name ?: "")
+                ?.groupValues?.getOrNull(1)
+                ?.toIntOrNull()
+
+            newEpisode(fixed) {
+                this.name = name
+                this.episode = episode
             }
+        }
 
         showToast("LOAD: episodes = ${episodes.size}")
 
@@ -88,6 +102,8 @@ class DoramaLandProvider : MainAPI() {
             this.plot = description
         }
     }
+
+
     
     override suspend fun loadLinks(
         data: String,
