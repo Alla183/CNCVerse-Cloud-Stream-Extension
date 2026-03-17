@@ -102,48 +102,45 @@ class DoramaLandProvider : MainAPI() {
             }
         }
 
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
+        override suspend fun loadLinks(
+            data: String,
+            isCasting: Boolean,
+            subtitleCallback: (SubtitleFile) -> Unit,
+            callback: (ExtractorLink) -> Unit
+        ): Boolean {
 
+            val doc = app.get(data).document
+            val players = doc.select("[data-url-player]")
 
+            players.forEach { player ->
 
-        val doc = app.get(data).document
+                val name = player.selectFirst("h3")?.text() ?: "Voice"
+                val iframe = player.attr("data-url-player")
+                val iframeUrl = fixUrl(iframe)
 
-        val players = doc.select("[data-url-player]")
+                val iframePage = app.get(iframeUrl).text
 
-        players.forEach { player ->
+                val streamBase = Regex(
+                    """https://s\d+\.jaswish\.com/content/stream/(serials|films)/[^"]+/hls/"""
+                ).find(iframePage)?.value
 
-            val name = player.selectFirst("h3")?.text() ?: "Voice"
-            val iframe = player.attr("data-url-player")
+                if (streamBase != null) {
 
+                    val m3u8 = streamBase + "index.m3u8"
 
-            val iframeUrl = fixUrl(iframe)
-
-            val iframePage = app.get(iframeUrl).text
-
-
-            val m3u8 = Regex("""https://[^"]+\.m3u8""")
-                .find(iframePage)
-                ?.value
-
-
-            if (m3u8 != null) {
-
-                callback.invoke(
-                    newExtractorLink(
-                        "DoramaLand",
-                        name,
-                        m3u8,
-                        ExtractorLinkType.M3U8
+                    callback.invoke(
+                        newExtractorLink(
+                            "DoramaLand",
+                            name,
+                            m3u8,
+                            ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = "https://a.jaswish.com/"
+                        }
                     )
-                )
+                }
             }
-        }
 
-        return true
-    }
+            return true
+        }   
 }
