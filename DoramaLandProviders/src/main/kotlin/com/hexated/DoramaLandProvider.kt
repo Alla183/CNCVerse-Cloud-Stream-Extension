@@ -99,14 +99,29 @@ class DoramaLandProvider : MainAPI() {
 
     // Шукаємо div з відеоплеєром
         val playerDiv = doc.selectFirst("div[id^=videoplayer]")
-            ?: return showToast("Player не знайдено на сторінці")
+        if (playerDiv == null) {
+            showToast("Player не знайдено на сторінці")
+        return false
+    }
+
+
 
         val dataConfigRaw = playerDiv.attr("data-config")
-        if (dataConfigRaw.isNullOrEmpty()) return showToast("data-config порожній")
+        if (dataConfigRaw.isNullOrEmpty()) {
+            showToast("data-config порожній")
+        return false
+    }
+
+
 
         val dataConfig = JSONObject(dataConfigRaw)
         val hls = dataConfig.optString("hls", "")
-        if (hls.isEmpty()) return showToast("HLS не знайдено")
+        if (hls.isEmpty()) {
+            showToast("HLS не знайдено")
+        return false
+    }
+
+
 
         callback.invoke(
             newExtractorLink(
