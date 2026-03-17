@@ -75,32 +75,32 @@ class DoramaLandProvider : MainAPI() {
     // 🔥 ГОЛОВНЕ ВИПРАВЛЕННЯ ТУТ
         val episodes = doc.select("div.short-cinematic").mapNotNull { el ->
 
-        val link = el.selectFirst("> a") ?: return@mapNotNull null
+            val link = el.selectFirst("> a") ?: return@mapNotNull null
 
-        val href = link.attr("href")
-        if (href.isNullOrEmpty()) return@mapNotNull null
+            val href = link.attr("href")
+            if (href.isNullOrEmpty()) return@mapNotNull null
 
-        val name = el.selectFirst(".short-cinematic__episode-number")
-            ?.text()
-            ?: "Episode"
+            val name = el.selectFirst(".short-cinematic__episode-number")
+                ?.text()
+                ?: "Episode"
 
-        val episode = Regex("(\\d+)")
-            .find(name)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.toIntOrNull()
+            val episode = Regex("(\\d+)")
+                .find(name)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.toIntOrNull()
 
-        newEpisode(fixUrl(href)) {
-            this.name = name
-            this.episode = episode
+            newEpisode(fixUrl(href)) {
+                this.name = name
+                this.episode = episode
+            }
         }
-    }
 
             return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
-            this.posterUrl = poster
-            this.plot = description
+                this.posterUrl = poster
+                this.plot = description
+            }
         }
-    }
 
     override suspend fun loadLinks(
         data: String,
