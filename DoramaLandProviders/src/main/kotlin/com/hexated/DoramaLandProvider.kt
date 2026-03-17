@@ -93,9 +93,6 @@ class DoramaLandProvider : MainAPI() {
                 }
             }
 
-    // 🔍 лог для перевірки
-        log("Episodes found: ${episodes.size}")
-
         return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
             this.posterUrl = poster
             this.plot = description
@@ -109,32 +106,27 @@ class DoramaLandProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        log("DoramaLand loadLinks start: $data")
+
 
         val doc = app.get(data).document
 
         val players = doc.select("[data-url-player]")
-        log("Players found: ${players.size}")
 
         players.forEach { player ->
 
             val name = player.selectFirst("h3")?.text() ?: "Voice"
             val iframe = player.attr("data-url-player")
 
-            log("Player: $name")
-            log("Iframe: $iframe")
 
             val iframeUrl = fixUrl(iframe)
 
             val iframePage = app.get(iframeUrl).text
 
-            log("Iframe page length: ${iframePage.length}")
 
             val m3u8 = Regex("""https://[^"]+\.m3u8""")
                 .find(iframePage)
                 ?.value
 
-            log("M3U8 found: $m3u8")
 
             if (m3u8 != null) {
 
