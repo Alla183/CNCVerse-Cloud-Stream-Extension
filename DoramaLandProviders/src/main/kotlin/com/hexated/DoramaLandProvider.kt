@@ -40,16 +40,45 @@ class DoramaLandProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val doc = app.get("$mainUrl/search?q=$query").document
+        println("=== SEARCH START ===")
+        println("Query: $query")
+    
+        val url = "$mainUrl/search?q=$query"
+        println("Fetching URL: $url")
+    
+        val doc = app.get(url).document
+        println("Document title: ${doc.title()}")
 
-        return doc.select(".search-item").map { element ->
-            val title = element.selectFirst(".search-item__title")?.text() ?: "No title"
-            val href = fixUrl(element.selectFirst(".search-item-wrap")?.attr("href") ?: "")
+        val elements = doc.select(".search-item")
+        println("Found ${elements.size} search items")
 
-        // 🔹 новий селектор для картинки
-            val poster = element.selectFirst("div.search-image-wrap img, .search-item-img img")
-                ?.attr("src")
-                ?.let { fixUrl(it) } ?: ""
+        return elements.mapNotNull { element ->
+            val title = element.selectFirst(".search-item__title")?.text()?.trim()
+            val hrefRaw = element.selectFirst(".search-item-wrap")?.attr("href")?.trim()
+
+            println("\n--- SEARCH ITEM ---")
+            println("Raw title: ${element.selectFirst(".search-item__title")?.text()}")
+            println("Raw href: ${element.selectFirst(".search-item-wrap")?.attr("href")}")
+
+            if (title.isNullOrEmpty() || hrefRaw.isNullOrEmpty()) {
+                println("Skipping item: missing title or href")
+                return@mapNotNull null
+            }
+
+            val href = fixUrl(hrefRaw)
+            println("Fixed href: $href")
+
+        // Пробуємо кілька селекторів для постера
+            val posterEl = element.selectFirst("div.search-image-wrap img, .search-item-img img")
+            val posterSrc = posterEl?.attr("src")?.trim()
+            val poster = posterSrc?.let { fixUrl(it) } ?: run {
+                println("Poster not found for '$title'")
+                null
+            }
+
+            println("Poster element: $posterEl")
+            println("Poster src: $posterSrc")
+            println("Poster fixed: $poster")
 
             newTvSeriesSearchResponse(title, href, TvType.AsianDrama) {
                 this.posterUrl = poster
