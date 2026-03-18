@@ -40,45 +40,50 @@ class DoramaLandProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        println("=== SEARCH START ===")
-        println("Query: $query")
-    
-        val url = "$mainUrl/search?q=$query"
-        println("Fetching URL: $url")
-    
-        val doc = app.get(url).document
-        println("Document title: ${doc.title()}")
+        println("=== SEARCH START === $query")
 
+        val doc = app.get("$mainUrl/search?q=$query").document
         val elements = doc.select(".search-item")
-        println("Found ${elements.size} search items")
+
+        println("FOUND ITEMS: ${elements.size}")
 
         return elements.mapNotNull { element ->
-            val title = element.selectFirst(".search-item__title")?.text()?.trim()
-            val hrefRaw = element.selectFirst(".search-item-wrap")?.attr("href")?.trim()
 
-            println("\n--- SEARCH ITEM ---")
-            println("Raw title: ${element.selectFirst(".search-item__title")?.text()}")
-            println("Raw href: ${element.selectFirst(".search-item-wrap")?.attr("href")}")
+            val title = element.selectFirst(".search-item__title")?.text()?.trim()
+            val hrefRaw = element.selectFirst("a.search-item-wrap")?.attr("href")
 
             if (title.isNullOrEmpty() || hrefRaw.isNullOrEmpty()) {
-                println("Skipping item: missing title or href")
+                println("SKIP: no title or href")
                 return@mapNotNull null
             }
 
             val href = fixUrl(hrefRaw)
-            println("Fixed href: $href")
 
-        // Пробуємо кілька селекторів для постера
-            val posterEl = element.selectFirst("div.search-image-wrap img, .search-item-img img")
-            val posterSrc = posterEl?.attr("src")?.trim()
-            val poster = posterSrc?.let { fixUrl(it) } ?: run {
-                println("Poster not found for '$title'")
-                null
+        // 🔥 беремо src
+            val img = element.selectFirst("div.search-image-wrap img")
+
+            val rawSrc = img?.attr("src")?.trim()
+            val rawSrcSet = img?.attr("srcset")?.trim()
+
+            println("\n--- ITEM ---")
+            println("TITLE: $title")
+            println("HREF: $href")
+            println("RAW SRC: $rawSrc")
+            println("RAW SRCSET: $rawSrcSet")
+
+        // 🔥 ГОЛОВНИЙ ФІКС
+            val poster = when {
+                !rawSrc.isNullOrEmpty() -> {
+                    if (rawSrc.startsWith("http")) rawSrc else "$mainUrl$rawSrc"
+                }
+                !rawSrcSet.isNullOrEmpty() -> {
+                    val first = rawSrcSet.split(" ").firstOrNull()
+                    if (first != null && !first.startsWith("http")) "$mainUrl$first" else first
+                }
+                else -> null
             }
 
-            println("Poster element: $posterEl")
-            println("Poster src: $posterSrc")
-            println("Poster fixed: $poster")
+            println("FINAL POSTER: $poster")
 
             newTvSeriesSearchResponse(title, href, TvType.AsianDrama) {
                 this.posterUrl = poster
