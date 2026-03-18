@@ -118,33 +118,42 @@ class DoramaLandProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
+        println("LOADLINKS DATA: $data")
+
         val doc = app.get(data).document
 
-        val iframe = doc.selectFirst("iframe") ?: return false
+        val iframe = doc.selectFirst("iframe") ?: run {
+            println("NO IFRAME")
+            return false
+        }
+
         val rawSrc = iframe.attr("src").trim()
 
-        if (rawSrc.isEmpty()) return false
+        if (rawSrc.isEmpty()) {
+            println("EMPTY SRC")
+            return false
+        }
 
         val iframeUrl = when {
             rawSrc.startsWith("//") -> "https:$rawSrc"
-            rawSrc.startsWith("/") -> fixUrl(rawSrc)
+            rawSrc.startsWith("/") -> mainUrl + rawSrc
             rawSrc.startsWith("http") -> rawSrc
             else -> "https://$rawSrc"
         }
 
+        println("IFRAME URL: $iframeUrl")
+
         val iframeHtml = app.get(
             iframeUrl,
-            referer = mainUrl,
-            headers = mapOf(
-                "User-Agent" to USER_AGENT
-            )
+            referer = mainUrl
         ).text
 
-    // 💥 ГОЛОВНА МАГІЯ
         val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
             .find(iframeHtml)
             ?.value
             ?.replace("\\/", "/")
+
+        println("M3U8: $m3u8")
 
         if (m3u8.isNullOrEmpty()) return false
 
