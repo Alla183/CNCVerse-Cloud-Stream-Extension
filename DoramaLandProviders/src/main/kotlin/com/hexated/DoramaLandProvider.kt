@@ -121,42 +121,32 @@ class DoramaLandProvider : MainAPI() {
 
         println("LOADLINKS DATA: $data")
 
-    // 1. Відкриваємо сторінку епізоду
         val document = app.get(data).document
 
-    // 2. Дістаємо номер серії (s=XX)
-        val episodeNumber = Regex("""-(\d+)-seriya""")
-            .find(data)
-            ?.groupValues?.get(1)
-            ?: "1"
+    // 🔥 беремо всі озвучки
+        val players = document.select("[data-url-player]")
 
-        println("EPISODE: $episodeNumber")
-
-    // 3. Знаходимо всі озвучки
-        val options = document.select("#filterV option")
-
-        if (options.isEmpty()) {
-            println("NO VOICES FOUND")
+        if (players.isEmpty()) {
+            println("NO PLAYERS FOUND")
             return false
         }
 
-    // 4. Перебираємо всі озвучки
-        options.forEach { option ->
+        players.forEach { player ->
 
-            val voiceName = option.text().trim()
-            val vParam = option.attr("value")
+            val voiceName = player.attr("data-label").ifEmpty { "Unknown" }
+            var iframeUrl = player.attr("data-url-player")
 
-            println("VOICE: $voiceName | v=$vParam")
+            if (iframeUrl.isNullOrEmpty()) return@forEach
 
-            if (vParam.isNullOrEmpty()) return@forEach
+        // 👉 додаємо https
+            if (iframeUrl.startsWith("//")) {
+                iframeUrl = "https:$iframeUrl"
+            }
 
-        // 5. Формуємо iframe URL
-            val iframeUrl = "https://a.jaswish.com/pkybuen7l6vw5ars?v=$vParam&s=$episodeNumber"
-
+            println("VOICE: $voiceName")
             println("IFRAME: $iframeUrl")
 
             try {
-            // 6. Запит до iframe
                 val iframeHtml = app.get(
                     iframeUrl,
                     headers = mapOf(
@@ -165,7 +155,7 @@ class DoramaLandProvider : MainAPI() {
                     )
                 ).text
 
-            // 7. Шукаємо .m3u8
+            // 🔍 шукаємо m3u8
                 val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
                     .find(iframeHtml)
                     ?.value
@@ -176,9 +166,8 @@ class DoramaLandProvider : MainAPI() {
                     return@forEach
                 }
 
-                println("FOUND M3U8: $m3u8")
+                println("FOUND: $m3u8")
 
-            // 8. Додаємо як окреме джерело
                 M3u8Helper.generateM3u8(
                     source = "DoramaLand ($voiceName)",
                     streamUrl = m3u8,
@@ -186,7 +175,7 @@ class DoramaLandProvider : MainAPI() {
                 ).forEach(callback)
 
             } catch (e: Exception) {
-                println("ERROR WITH $voiceName: ${e.message}")
+                println("ERROR: ${e.message}")
             }
         }
 
