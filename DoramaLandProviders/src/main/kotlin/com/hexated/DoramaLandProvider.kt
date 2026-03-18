@@ -117,54 +117,42 @@ class DoramaLandProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        showToast("LOADLINKS")
-        
+
         val doc = app.get(data).document
 
-        val iframe = doc.selectFirst("iframe[src]") ?: return false
-
+        val iframe = doc.selectFirst("iframe") ?: return false
         val rawSrc = iframe.attr("src").trim()
+
+        if (rawSrc.isEmpty()) return false
 
         val iframeUrl = when {
             rawSrc.startsWith("//") -> "https:$rawSrc"
-            rawSrc.startsWith("/") -> "$mainUrl$rawSrc"
+            rawSrc.startsWith("/") -> fixUrl(rawSrc)
             rawSrc.startsWith("http") -> rawSrc
             else -> "https://$rawSrc"
         }
 
-        println("IFRAME URL FIXED: $iframeUrl")
-
-
-        val iframeDoc = app.get(
+        val iframeHtml = app.get(
             iframeUrl,
-            referer = "https://dorama.land/",
+            referer = mainUrl,
             headers = mapOf(
-                "User-Agent" to USER_AGENT,
-                "Accept" to "*/*"
+                "User-Agent" to USER_AGENT
             )
-        ).document
+        ).text
 
-        println("IFRAME HTML: ${iframeDoc.html().take(500)}")
-        val playerDiv = iframeDoc.selectFirst("div[id^=videoplayer], div[data-config]")
-            ?: return false
+    // 💥 ГОЛОВНА МАГІЯ
+        val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
+            .find(iframeHtml)
+            ?.value
+            ?.replace("\\/", "/")
 
-        val dataConfigRaw = playerDiv.attr("data-config")
-            .replace("&quot;", "\"")
-
-        if (dataConfigRaw.isEmpty()) return false
-
-        val json = JSONObject(dataConfigRaw)
-
-        val hls = json.optString("hls")
-            .ifEmpty { json.optString("file") }
-
-        if (hls.isEmpty()) return false
+        if (m3u8.isNullOrEmpty()) return false
 
         callback.invoke(
             newExtractorLink(
                 "DoramaLand",
                 "Main",
-                hls,
+                m3u8,
                 ExtractorLinkType.M3U8
             ) {
                 this.referer = iframeUrl
