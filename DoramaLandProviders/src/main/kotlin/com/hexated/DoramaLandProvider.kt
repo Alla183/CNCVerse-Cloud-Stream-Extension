@@ -120,20 +120,33 @@ class DoramaLandProvider : MainAPI() {
 
         println("LOADLINKS DATA: $data")
 
-        val doc = app.get(data).document
+    // 🔹 Завантажуємо HTML сторінки епізоду
+        val episodeHtml = app.get(data).text
 
-        val iframe = doc.selectFirst("iframe") ?: run {
-            println("NO IFRAME")
+    // 🔹 Пробуємо знайти iframe через Jsoup
+        val iframe = app.get(data).document.selectFirst("iframe")
+
+        var rawSrc = iframe?.attr("src")
+            ?.ifEmpty { iframe.attr("data-src") }
+            ?.trim()
+
+    // 🔹 fallback через regex (як у Python)
+        if (rawSrc.isNullOrEmpty()) {
+            println("JSOUP FAILED, TRY REGEX")
+            rawSrc = Regex("""<iframe[^>]+src=["']([^"']+)""")
+                .find(episodeHtml)
+                ?.groupValues?.get(1)
+                ?.trim()
+        }
+
+        if (rawSrc.isNullOrEmpty()) {
+            println("❌ NO IFRAME SRC AT ALL")
             return false
         }
 
-        val rawSrc = iframe.attr("src").trim()
+        println("RAW SRC: $rawSrc")
 
-        if (rawSrc.isEmpty()) {
-            println("EMPTY SRC")
-            return false
-        }
-
+    // 🔹 Формуємо повний URL iframe
         val iframeUrl = when {
             rawSrc.startsWith("//") -> "https:$rawSrc"
             rawSrc.startsWith("/") -> mainUrl + rawSrc
@@ -143,20 +156,32 @@ class DoramaLandProvider : MainAPI() {
 
         println("IFRAME URL: $iframeUrl")
 
+    // 🔹 Запит до iframe, щоб отримати реальний HTML з .m3u8
         val iframeHtml = app.get(
             iframeUrl,
-            referer = mainUrl
+            referer = mainUrl,
+            headers = mapOf(
+                "User-Agent" to USER_AGENT
+            )
         ).text
 
+        println("=== IFRAME HTML (first 500 chars) ===")
+        println(iframeHtml.take(500))
+
+    // 🔹 Шукаємо .m3u8 через regex
         val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
             .find(iframeHtml)
             ?.value
-            ?.replace("\\/", "/")
+            ?.replace("\\/", "/")  // виправляємо escaped символи
 
-        println("M3U8: $m3u8")
+        if (m3u8.isNullOrEmpty()) {
+            println("❌ M3U8 NOT FOUND")
+            return false
+        }
 
-        if (m3u8.isNullOrEmpty()) return false
+        println("M3U8 FOUND: $m3u8")
 
+    // 🔹 Відправляємо посилання в Cloudstream
         callback.invoke(
             newExtractorLink(
                 "DoramaLand",
