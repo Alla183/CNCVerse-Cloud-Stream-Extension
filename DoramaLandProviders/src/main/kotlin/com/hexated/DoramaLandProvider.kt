@@ -62,25 +62,26 @@ class DoramaLandProvider : MainAPI() {
         // 🔥 беремо src
             val img = element.selectFirst("div.search-image-wrap img")
 
-            val rawSrc = img?.attr("src")?.trim()
-            val rawSrcSet = img?.attr("srcset")?.trim()
+            val src = img?.attr("src")?.trim()
+            val srcset = img?.attr("srcset")?.trim()
+            val dataSrc = img?.attr("data-src")?.trim()
+            val dataSrcSet = img?.attr("data-srcset")?.trim()
 
-            println("\n--- ITEM ---")
-            println("TITLE: $title")
-            println("HREF: $href")
-            println("RAW SRC: $rawSrc")
-            println("RAW SRCSET: $rawSrcSet")
+            println("SRC: $src")
+            println("SRCSET: $srcset")
+            println("DATA-SRC: $dataSrc")
+            println("DATA-SRCSET: $dataSrcSet")
 
-        // 🔥 ГОЛОВНИЙ ФІКС
-            val poster = when {
-                !rawSrc.isNullOrEmpty() -> {
-                    if (rawSrc.startsWith("http")) rawSrc else "$mainUrl$rawSrc"
-                }
-                !rawSrcSet.isNullOrEmpty() -> {
-                    val first = rawSrcSet.split(" ").firstOrNull()
-                    if (first != null && !first.startsWith("http")) "$mainUrl$first" else first
-                }
+            val posterRaw = when {
+                !dataSrc.isNullOrEmpty() -> dataSrc                     // 🔥 ГОЛОВНЕ
+                !src.isNullOrEmpty() -> src
+                !dataSrcSet.isNullOrEmpty() -> dataSrcSet.split(" ").firstOrNull()
+                !srcset.isNullOrEmpty() -> srcset.split(" ").firstOrNull()
                 else -> null
+            }
+
+            val poster = posterRaw?.let {
+                if (it.startsWith("http")) it else "$mainUrl$it"
             }
 
             println("FINAL POSTER: $poster")
