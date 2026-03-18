@@ -121,32 +121,38 @@ class DoramaLandProvider : MainAPI() {
         
         val doc = app.get(data).document
 
-        val iframe = doc.selectFirst("iframe") ?: run {
-            showToast("iframe не знайдено")
-            return false
+        val iframe = doc.selectFirst("iframe") ?: return false
+
+        val rawSrc = iframe.attr("src")
+        val iframeUrl = if (rawSrc.startsWith("//")) {
+            "https:$rawSrc"
+        } else {
+            fixUrl(rawSrc)
         }
 
-        val iframeUrl = fixUrl(iframe.attr("src"))
-        val iframeDoc = app.get(iframeUrl, referer = mainUrl).document
+        val iframeDoc = app.get(
+            iframeUrl,
+            referer = "https://dorama.land/",
+            headers = mapOf(
+                "User-Agent" to USER_AGENT,
+                "Accept" to "*/*"
+            )
+        ).document
 
-        val playerDiv = iframeDoc.selectFirst("div[id^=videoplayer]") ?: run {
-            showToast("Player не знайдено в iframe")
-            return false
-        }
+        val playerDiv = iframeDoc.selectFirst("div[id^=videoplayer], div[data-config]")
+            ?: return false
 
         val dataConfigRaw = playerDiv.attr("data-config")
-        if (dataConfigRaw.isNullOrEmpty()) {
-            showToast("data-config порожній")
-            return false
-        }
+            .replace("&quot;", "\"")
 
-        val dataConfig = JSONObject(dataConfigRaw)
-        val hls = dataConfig.optString("hls")
+        if (dataConfigRaw.isEmpty()) return false
 
-        if (hls.isNullOrEmpty()) {
-            showToast("HLS не знайдено")
-            return false
-        }
+        val json = JSONObject(dataConfigRaw)
+
+        val hls = json.optString("hls")
+            .ifEmpty { json.optString("file") }
+
+        if (hls.isEmpty()) return false
 
         callback.invoke(
             newExtractorLink(
