@@ -139,6 +139,7 @@ class DoramaLandProvider : MainAPI() {
             )
         ).document
 
+        println("IFRAME HTML: ${iframeDoc.html().take(500)}")
         val playerDiv = iframeDoc.selectFirst("div[id^=videoplayer], div[data-config]")
             ?: return false
 
