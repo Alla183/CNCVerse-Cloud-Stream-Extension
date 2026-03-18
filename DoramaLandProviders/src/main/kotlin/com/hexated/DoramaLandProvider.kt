@@ -121,14 +121,19 @@ class DoramaLandProvider : MainAPI() {
         
         val doc = app.get(data).document
 
-        val iframe = doc.selectFirst("iframe") ?: return false
+        val iframe = doc.selectFirst("iframe[src]") ?: return false
 
-        val rawSrc = iframe.attr("src")
-        val iframeUrl = if (rawSrc.startsWith("//")) {
-            "https:$rawSrc"
-        } else {
-            fixUrl(rawSrc)
+        val rawSrc = iframe.attr("src").trim()
+
+        val iframeUrl = when {
+            rawSrc.startsWith("//") -> "https:$rawSrc"
+            rawSrc.startsWith("/") -> "$mainUrl$rawSrc"
+            rawSrc.startsWith("http") -> rawSrc
+            else -> "https://$rawSrc"
         }
+
+        println("IFRAME URL FIXED: $iframeUrl")
+
 
         val iframeDoc = app.get(
             iframeUrl,
