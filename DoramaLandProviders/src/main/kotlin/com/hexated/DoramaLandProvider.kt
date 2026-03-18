@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 import org.json.JSONObject
 import com.lagradost.cloudstream3.CommonActivity.showToast
+import com.lagradost.cloudstream3.utils.M3u8Helper
 
 class DoramaLandProvider : MainAPI() {
 
@@ -120,78 +121,74 @@ class DoramaLandProvider : MainAPI() {
 
         println("LOADLINKS DATA: $data")
 
-    // 🔹 Завантажуємо HTML сторінки епізоду
-        val episodeHtml = app.get(data).text
+    // 1. Відкриваємо сторінку епізоду
+        val document = app.get(data).document
 
-    // 🔹 Пробуємо знайти iframe через Jsoup
-        val iframe = app.get(data).document.selectFirst("iframe")
+    // 2. Дістаємо номер серії (s=XX)
+        val episodeNumber = Regex("""-(\d+)-seriya""")
+            .find(data)
+            ?.groupValues?.get(1)
+            ?: "1"
 
-        var rawSrc = iframe?.attr("src")
-            ?.ifEmpty { iframe.attr("data-src") }
-            ?.trim()
+        println("EPISODE: $episodeNumber")
 
-    // 🔹 fallback через regex (як у Python)
-        if (rawSrc.isNullOrEmpty()) {
-            println("JSOUP FAILED, TRY REGEX")
-            rawSrc = Regex("""<iframe[^>]+src=["']([^"']+)""")
-                .find(episodeHtml)
-                ?.groupValues?.get(1)
-                ?.trim()
-        }
+    // 3. Знаходимо всі озвучки
+        val options = document.select("#filterV option")
 
-        if (rawSrc.isNullOrEmpty()) {
-            println("❌ NO IFRAME SRC AT ALL")
+        if (options.isEmpty()) {
+            println("NO VOICES FOUND")
             return false
         }
 
-        println("RAW SRC: $rawSrc")
+    // 4. Перебираємо всі озвучки
+        options.forEach { option ->
 
-    // 🔹 Формуємо повний URL iframe
-        val iframeUrl = when {
-            rawSrc.startsWith("//") -> "https:$rawSrc"
-            rawSrc.startsWith("/") -> mainUrl + rawSrc
-            rawSrc.startsWith("http") -> rawSrc
-            else -> "https://$rawSrc"
-        }
+            val voiceName = option.text().trim()
+            val vParam = option.attr("value")
 
-        println("IFRAME URL: $iframeUrl")
+            println("VOICE: $voiceName | v=$vParam")
 
-    // 🔹 Запит до iframe, щоб отримати реальний HTML з .m3u8
-        val iframeHtml = app.get(
-            iframeUrl,
-            referer = mainUrl,
-            headers = mapOf(
-                "User-Agent" to USER_AGENT
-            )
-        ).text
+            if (vParam.isNullOrEmpty()) return@forEach
 
-        println("=== IFRAME HTML (first 500 chars) ===")
-        println(iframeHtml.take(500))
+        // 5. Формуємо iframe URL
+            val iframeUrl = "https://a.jaswish.com/pkybuen7l6vw5ars?v=$vParam&s=$episodeNumber"
 
-    // 🔹 Шукаємо .m3u8 через regex
-        val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
-            .find(iframeHtml)
-            ?.value
-            ?.replace("\\/", "/")  // виправляємо escaped символи
+            println("IFRAME: $iframeUrl")
 
-        if (m3u8.isNullOrEmpty()) {
-            println("❌ M3U8 NOT FOUND")
-            return false
-        }
+            try {
+            // 6. Запит до iframe
+                val iframeHtml = app.get(
+                    iframeUrl,
+                    headers = mapOf(
+                        "Referer" to "https://dorama.land/",
+                        "User-Agent" to USER_AGENT
+                    )
+                ).text
 
-        println("M3U8 FOUND: $m3u8")
+            // 7. Шукаємо .m3u8
+                val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
+                    .find(iframeHtml)
+                    ?.value
+                    ?.replace("\\/", "/")
 
-    // 🔹 Відправляємо посилання в Cloudstream
-        callback.invoke(
-            newExtractorLink(
-                "DoramaLand",
-                "Main",
-                m3u8,
-                ExtractorLinkType.M3U8
-            ) {
-                this.referer = iframeUrl
+                if (m3u8.isNullOrEmpty()) {
+                    println("NO M3U8 FOR $voiceName")
+                    return@forEach
+                }
+
+                println("FOUND M3U8: $m3u8")
+
+            // 8. Додаємо як окреме джерело
+                M3u8Helper.generateM3u8(
+                    source = "DoramaLand ($voiceName)",
+                    streamUrl = m3u8,
+                    referer = "https://dorama.land/"
+                ).forEach(callback)
+
+            } catch (e: Exception) {
+                println("ERROR WITH $voiceName: ${e.message}")
             }
-        )
+        }
 
         return true
     }
