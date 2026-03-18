@@ -97,7 +97,7 @@ class DoramaLandProvider : MainAPI() {
                 this.name = name
                 this.episode = episode
 
-                this.data = fixUrl(href)
+                this.data = fixed
             }
         }
 
@@ -117,7 +117,7 @@ class DoramaLandProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        log("LOADLINKS CALLED with data = $data")
+        showToast("LOADLINKS")
         
         val doc = app.get(data).document
 
