@@ -45,7 +45,11 @@ class DoramaLandProvider : MainAPI() {
         return doc.select(".search-item").map { element ->
             val title = element.selectFirst(".search-item__title")?.text() ?: "No title"
             val href = fixUrl(element.selectFirst(".search-item-wrap")?.attr("href") ?: "")
-            val poster = fixUrlNull(element.selectFirst(".search-item-img img")?.attr("src"))
+
+        // 🔹 новий селектор для картинки
+            val poster = element.selectFirst("div.search-image-wrap img, .search-item-img img")
+                ?.attr("src")
+                ?.let { fixUrl(it) } ?: ""
 
             newTvSeriesSearchResponse(title, href, TvType.AsianDrama) {
                 this.posterUrl = poster
