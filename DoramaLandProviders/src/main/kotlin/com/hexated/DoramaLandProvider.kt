@@ -125,7 +125,25 @@ class DoramaLandProvider : MainAPI() {
         val related = doc.select(".related-serials .catalog-item").mapNotNull { el ->
             val href = el.selectFirst("a")?.attr("href") ?: return@mapNotNull null
             val title = el.selectFirst(".catalog-item__title")?.text() ?: return@mapNotNull null
-            val poster = fixUrlNull(el.selectFirst("img")?.attr("src"))
+            
+            val img = el.selectFirst(".catalog-item__img img")
+
+            val src = img?.attr("src")?.trim()
+            val srcset = img?.attr("srcset")?.trim()
+            val dataSrc = img?.attr("data-src")?.trim()
+            val dataSrcSet = img?.attr("data-srcset")?.trim()
+
+            val posterRaw = when {
+                !dataSrc.isNullOrEmpty() -> dataSrc
+                !src.isNullOrEmpty() -> src
+                !dataSrcSet.isNullOrEmpty() -> dataSrcSet.split(" ").firstOrNull()
+                !srcset.isNullOrEmpty() -> srcset.split(" ").firstOrNull()
+                else -> null
+            }
+
+            val poster = posterRaw?.let {
+                if (it.startsWith("http")) it else "$mainUrl$it"
+            }
 
             newTvSeriesSearchResponse(title, fixUrl(href), TvType.AsianDrama) {
                 this.posterUrl = poster
@@ -138,7 +156,25 @@ class DoramaLandProvider : MainAPI() {
         val recommendations = doc.select(".similar-serials .catalog-item").mapNotNull { el ->
             val href = el.selectFirst("a")?.attr("href") ?: return@mapNotNull null
             val title = el.selectFirst(".catalog-item__title")?.text() ?: return@mapNotNull null
-            val poster = fixUrlNull(el.selectFirst("img")?.attr("src"))
+            
+            val img = el.selectFirst(".catalog-item__img img")
+
+            val src = img?.attr("src")?.trim()
+            val srcset = img?.attr("srcset")?.trim()
+            val dataSrc = img?.attr("data-src")?.trim()
+            val dataSrcSet = img?.attr("data-srcset")?.trim()
+
+            val posterRaw = when {
+                !dataSrc.isNullOrEmpty() -> dataSrc
+                !src.isNullOrEmpty() -> src
+                !dataSrcSet.isNullOrEmpty() -> dataSrcSet.split(" ").firstOrNull()
+                !srcset.isNullOrEmpty() -> srcset.split(" ").firstOrNull()
+                else -> null
+            }
+
+            val poster = posterRaw?.let {
+                if (it.startsWith("http")) it else "$mainUrl$it"
+            }
 
             newTvSeriesSearchResponse(title, fixUrl(href), TvType.AsianDrama) {
                 this.posterUrl = poster
