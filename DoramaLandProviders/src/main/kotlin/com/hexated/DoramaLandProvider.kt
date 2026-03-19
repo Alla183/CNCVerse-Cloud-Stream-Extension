@@ -120,6 +120,32 @@ class DoramaLandProvider : MainAPI() {
             ?.filter { it.isNotEmpty() }
 
         println("GENRES LIST: $genres")
+
+        // 🔗 RELATED
+        val related = doc.select(".related-serials .catalog-item").mapNotNull { el ->
+            val href = el.selectFirst("a")?.attr("href") ?: return@mapNotNull null
+            val title = el.selectFirst(".catalog-item__title")?.text() ?: return@mapNotNull null
+            val poster = fixUrlNull(el.selectFirst("img")?.attr("src"))
+
+            newTvSeriesSearchResponse(title, fixUrl(href), TvType.AsianDrama) {
+                this.posterUrl = poster
+            }
+         }
+
+        println("RELATED SIZE: ${related.size}")
+
+// ⭐ RECOMMENDATIONS (similar)
+        val recommendations = doc.select(".similar-serials .catalog-item").mapNotNull { el ->
+            val href = el.selectFirst("a")?.attr("href") ?: return@mapNotNull null
+            val title = el.selectFirst(".catalog-item__title")?.text() ?: return@mapNotNull null
+            val poster = fixUrlNull(el.selectFirst("img")?.attr("src"))
+
+            newTvSeriesSearchResponse(title, fixUrl(href), TvType.AsianDrama) {
+                this.posterUrl = poster
+            }
+        }
+
+        println("RECOMMENDATIONS SIZE: ${recommendations.size}")
         
         val episodeElements = doc.select(".short-cinematic")
         println("EP ELEMENTS SIZE: ${episodeElements.size}")
@@ -158,6 +184,7 @@ class DoramaLandProvider : MainAPI() {
             this.posterUrl = poster
             this.plot = description
             this.tags = genres
+            this.recommendations = related + recommendations
         }
     }
 
