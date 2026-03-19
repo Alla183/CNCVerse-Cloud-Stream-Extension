@@ -206,10 +206,30 @@ class DoramaLandProvider : MainAPI() {
                 ?.groupValues?.getOrNull(1)
                 ?.toIntOrNull()
 
+            // 🎬 POSTER
+            val img = ep.selectFirst(".short-cinematic__img img")
+
+            val src = img?.attr("src")?.trim()
+            val srcset = img?.attr("srcset")?.trim()
+            val dataSrc = img?.attr("data-src")?.trim()
+            val dataSrcSet = img?.attr("data-srcset")?.trim()
+
+            val posterRaw = when {
+                !dataSrc.isNullOrEmpty() -> dataSrc
+                !src.isNullOrEmpty() -> src
+                !dataSrcSet.isNullOrEmpty() -> dataSrcSet.split(" ").firstOrNull()
+                !srcset.isNullOrEmpty() -> srcset.split(" ").firstOrNull()
+                else -> null
+            }
+
+            val poster = posterRaw?.let {
+                if (it.startsWith("http")) it else "$mainUrl$it"
+            }
+            
             newEpisode(fixed) {
                 this.name = name
                 this.episode = episode
-
+                this.posterUrl = poster
                 this.data = fixed
             }
         }
