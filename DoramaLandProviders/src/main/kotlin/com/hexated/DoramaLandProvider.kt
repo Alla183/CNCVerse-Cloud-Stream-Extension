@@ -110,6 +110,17 @@ class DoramaLandProvider : MainAPI() {
             ".serial-description-text .spoiler__content[itemprop=description]"
         )?.text()
 
+        // 🎭 ЖАНРИ
+        val genresRaw = doc.selectFirst(".serial-genres-links [itemprop=genre]")?.text()
+        println("GENRES RAW: $genresRaw")
+
+        val genres = genresRaw
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+
+        println("GENRES LIST: $genres")
+        
         val episodeElements = doc.select(".short-cinematic")
         println("EP ELEMENTS SIZE: ${episodeElements.size}")
 
@@ -146,6 +157,7 @@ class DoramaLandProvider : MainAPI() {
         return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
             this.posterUrl = poster
             this.plot = description
+            this.tags = genres
         }
     }
 
