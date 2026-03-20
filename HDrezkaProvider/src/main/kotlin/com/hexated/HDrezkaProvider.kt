@@ -195,14 +195,23 @@ class HDrezkaProvider : MainAPI() {
                 addTrailer(trailer)
             }
         } else {
-            document.select("ul#translators-list a").map { res ->
+            val translators = document.select("#translators-list li, #translators-list a")
+
+            translators.forEach { el ->
+                val node = if (el.tagName() == "li") {
+                    el.selectFirst("a") ?: el
+                } else el
+
+                val id = node.attr("data-translator_id")
+                if (id.isNullOrBlank()) return@forEach // пропускаємо сміття
+
                 server.add(
                     mapOf(
-                        "translator_name" to res.text(),
-                        "translator_id" to res.attr("data-translator_id"),
-                        "camrip" to res.attr("data-camrip"),
-                        "ads" to res.attr("data-ads"),
-                        "director" to res.attr("data-director")
+                        "translator_name" to node.text().trim(),
+                        "translator_id" to id,
+                        "camrip" to node.attr("data-camrip"),
+                        "ads" to node.attr("data-ads"),
+                        "director" to node.attr("data-director")
                     )
                 )
             }
