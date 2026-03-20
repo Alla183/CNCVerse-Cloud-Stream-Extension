@@ -236,6 +236,19 @@ class DoramaLandProvider : MainAPI() {
 
         showToast("LOAD: episodes = ${episodes.size}")
 
+        if (episodes.isEmpty()) {
+            println("🎬 MOVIE DETECTED (no episodes)")
+
+            return newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = poster
+                this.plot = description
+                this.tags = genres
+                this.recommendations = related + recommendations
+            }
+        }
+
+        println("📺 SERIES DETECTED (${episodes.size} episodes)")
+
         return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
             this.posterUrl = poster
             this.plot = description
