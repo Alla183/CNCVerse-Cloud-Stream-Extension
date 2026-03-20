@@ -257,60 +257,181 @@ class DoramaLandProvider : MainAPI() {
 
         val document = app.get(data).document
 
-    // 🔥 беремо всі озвучки
+    // =========================================
+    // 🎬 1. ПРОБУЄМО ЯК СЕРІАЛ (старий код)
+    // =========================================
         val players = document.select("[data-url-player]")
 
-        if (players.isEmpty()) {
-            println("NO PLAYERS FOUND")
+        if (players.isNotEmpty()) {
+            println("📺 SERIES MODE")
+
+            players.forEach { player ->
+
+                val voiceName = player.attr("data-label").ifEmpty { "Unknown" }
+                var iframeUrl = player.attr("data-url-player")
+
+                if (iframeUrl.isNullOrEmpty()) return@forEach
+
+                if (iframeUrl.startsWith("//")) {
+                    iframeUrl = "https:$iframeUrl"
+                }
+
+                try {
+                    val iframeHtml = app.get(
+                        iframeUrl,
+                        headers = mapOf(
+                            "Referer" to mainUrl,
+                            "User-Agent" to USER_AGENT
+                        )
+                    ).text
+
+                    val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
+                        .find(iframeHtml)
+                        ?.value
+                        ?.replace("\\/", "/")
+
+                    if (m3u8.isNullOrEmpty()) return@forEach
+
+                    println("✅ SERIES: $voiceName → $m3u8")
+
+                    M3u8Helper.generateM3u8(
+                        source = "DoramaLand ($voiceName)",
+                        streamUrl = m3u8,
+                        referer = mainUrl
+                    ).forEach(callback)
+
+                } catch (e: Exception) {
+                    println("ERROR: ${e.message}")
+                }
+            }
+
+            return true
+        }
+
+    // =========================================
+    // 🎬 2. ФІЛЬМ (НОВА ЛОГІКА)
+    // =========================================
+        println("🎬 MOVIE MODE")
+
+        val iframe = document.selectFirst("iframe[data-src]")
+
+        if (iframe == null) {
+            println("❌ NO IFRAME")
             return false
         }
 
-        players.forEach { player ->
+        var baseIframe = iframe.attr("data-src")
+        if (baseIframe.startsWith("//")) {
+            baseIframe = "https:$baseIframe"
+        }
 
-            val voiceName = player.attr("data-label").ifEmpty { "Unknown" }
-            var iframeUrl = player.attr("data-url-player")
+        println("🌐 BASE IFRAME: $baseIframe")
 
-            if (iframeUrl.isNullOrEmpty()) return@forEach
+        try {
+            val iframeDoc = app.get(
+                baseIframe,
+                headers = mapOf(
+                    "Referer" to mainUrl,
+                    "User-Agent" to USER_AGENT
+                )
+            ).document
 
-        // 👉 додаємо https
-            if (iframeUrl.startsWith("//")) {
-                iframeUrl = "https:$iframeUrl"
+        // 🔥 беремо inputData (голоси)
+            val inputData = iframeDoc.selectFirst("#inputData")
+
+            val voices = mutableListOf<Pair<String, String>>() // name + tag
+
+            if (inputData != null) {
+                val json = JSONObject(inputData.text())
+
+                val seasons = json.keys()
+                while (seasons.hasNext()) {
+                    val season = json.getJSONObject(seasons.next())
+
+                    val episodes = season.keys()
+                    while (episodes.hasNext()) {
+                        val epArray = season.getJSONArray(episodes.next())
+
+                        for (i in 0 until epArray.length()) {
+                            val item = epArray.getJSONObject(i)
+
+                            val name = item.getString("voice_name")
+                            val tag = item.getString("voice_tag")
+
+                            voices.add(name to tag)
+                        }
+                    }
+                }
             }
 
-            println("VOICE: $voiceName")
-            println("IFRAME: $iframeUrl")
+            println("🎧 FOUND VOICES: ${voices.size}")
 
-            try {
-                val iframeHtml = app.get(
-                    iframeUrl,
-                    headers = mapOf(
-                        "Referer" to "https://dorama.land/",
-                        "User-Agent" to USER_AGENT
-                    )
-                ).text
+        // якщо нема голосів — fallback
+            if (voices.isEmpty()) {
+                println("⚠️ NO VOICES → fallback to base iframe")
 
-            // 🔍 шукаємо m3u8
+                val html = iframeDoc.html()
+
                 val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
-                    .find(iframeHtml)
+                    .find(html)
                     ?.value
                     ?.replace("\\/", "/")
 
-                if (m3u8.isNullOrEmpty()) {
-                    println("NO M3U8 FOR $voiceName")
-                    return@forEach
+                if (!m3u8.isNullOrEmpty()) {
+                    M3u8Helper.generateM3u8(
+                        source = "DoramaLand",
+                        streamUrl = m3u8,
+                        referer = mainUrl
+                    ).forEach(callback)
                 }
 
-                println("FOUND: $m3u8")
-
-                M3u8Helper.generateM3u8(
-                    source = "DoramaLand ($voiceName)",
-                    streamUrl = m3u8,
-                    referer = "https://dorama.land/"
-                ).forEach(callback)
-
-            } catch (e: Exception) {
-                println("ERROR: ${e.message}")
+                return true
             }
+
+        // =========================================
+        // 🔥 ГОЛОВНЕ: ПЕРЕМИКАННЯ ОЗВУЧОК
+        // =========================================
+            voices.forEach { (voiceName, tag) ->
+
+                val newIframe = "$baseIframe&v=$tag"
+
+                println("🔊 $voiceName")
+                println("🌐 $newIframe")
+
+                try {
+                    val html = app.get(
+                        newIframe,
+                        headers = mapOf(
+                            "Referer" to mainUrl,
+                            "User-Agent" to USER_AGENT
+                        )
+                    ).text
+
+                    val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
+                        .find(html)
+                        ?.value
+                        ?.replace("\\/", "/")
+
+                    if (m3u8.isNullOrEmpty()) {
+                        println("❌ NO M3U8")
+                        return@forEach
+                    }
+
+                    println("✅ FOUND: $m3u8")
+
+                    M3u8Helper.generateM3u8(
+                        source = "DoramaLand ($voiceName)",
+                        streamUrl = m3u8,
+                        referer = mainUrl
+                    ).forEach(callback)
+
+                } catch (e: Exception) {
+                    println("ERROR: ${e.message}")
+                }
+            }
+
+        } catch (e: Exception) {
+            println("ERROR: ${e.message}")
         }
 
         return true
