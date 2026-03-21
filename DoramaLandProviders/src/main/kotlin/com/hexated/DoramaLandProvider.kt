@@ -21,19 +21,68 @@ class DoramaLandProvider : MainAPI() {
     override val hasMainPage = true
     override val mainPage = mainPageOf(
         "$mainUrl/all-dramas" to "Усі дорами",
-        "$mainUrl/tags/doramy-filmy-af" to "Фільми"
+        "$mainUrl/tags/doramy-filmy-af" to "Фільми",
+        "$mainUrl/#popular" to "Популярне",
+        "$mainUrl/#premieres" to "Прем'єри",
+        "$mainUrl/#expected" to "Очікуване"
+)
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val doc = app.get("$mainUrl/all-dramas?page=$page").document
 
-        val home = doc.select("div.catalog-item.catalog-item_type_poster").map { el ->
-            val title = el.selectFirst("div.catalog-item__title")?.text() ?: "No title"
-            val href = fixUrl(el.selectFirst("a")?.attr("href") ?: "")
-            val poster = fixUrlNull(el.selectFirst("img")?.attr("src"))
+        val url = request.data
+        val cleanUrl = url.substringBefore("#")
 
-            newTvSeriesSearchResponse(title, href, TvType.AsianDrama) {
-                this.posterUrl = poster
+        val doc = app.get("$cleanUrl?page=$page").document
+
+        val items = when {
+            url.contains("#popular") -> doc.select("#popular .catalog-item")
+            url.contains("#premieres") -> doc.select("#premieres .catalog-item")
+            url.contains("#expected") -> doc.select("#expected .catalog-item")
+
+        // 🎬 тільки фільми
+            url.contains("doramy-filmy") ->
+                doc.select("div.catalog-item.catalog-item_type_poster")
+                    .filter { it.selectFirst(".cinema-type-label.film") != null }
+
+            else -> doc.select("div.catalog-item.catalog-item_type_poster")
+        }
+
+        val home = items.mapNotNull { el ->
+
+            val title = el.selectFirst(".catalog-item__title")?.text() ?: return@mapNotNull null
+            val href = fixUrl(el.selectFirst("a")?.attr("href") ?: return@mapNotNull null)
+
+            val img = el.selectFirst("img")
+
+            val src = img?.attr("src")?.trim()
+            val dataSrc = img?.attr("data-src")?.trim()
+            val srcset = img?.attr("srcset")?.trim()
+            val dataSrcSet = img?.attr("data-srcset")?.trim()
+
+            val posterRaw = when {
+                !dataSrc.isNullOrEmpty() -> dataSrc
+                !src.isNullOrEmpty() -> src
+                !dataSrcSet.isNullOrEmpty() -> dataSrcSet.split(" ").firstOrNull()
+                !srcset.isNullOrEmpty() -> srcset.split(" ").firstOrNull()
+                else -> null
+            }
+
+            val poster = posterRaw?.let {
+                if (it.startsWith("http")) it else "$mainUrl$it"
+            }
+
+        // 🔥 визначаємо тип
+            val isMovie = el.selectFirst(".cinema-type-label.film") != null
+
+            if (isMovie) {
+                newMovieSearchResponse(title, href, TvType.Movie) {
+                    this.posterUrl = poster
+                }
+            } else {
+                newTvSeriesSearchResponse(title, href, TvType.AsianDrama) {
+                    this.posterUrl = poster
+                }
             }
         }
 
