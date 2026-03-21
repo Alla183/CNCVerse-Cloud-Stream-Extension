@@ -21,6 +21,7 @@ class DoramaLandProvider : MainAPI() {
     override val hasMainPage = true
     override val mainPage = mainPageOf(
         "$mainUrl/all-dramas" to "Усі дорами"
+        "$mainUrl/tags/doramy-filmy-af" to "🎬 Фільми"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
