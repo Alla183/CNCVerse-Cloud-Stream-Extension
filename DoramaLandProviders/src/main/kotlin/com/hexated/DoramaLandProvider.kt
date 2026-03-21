@@ -25,7 +25,6 @@ class DoramaLandProvider : MainAPI() {
         "$mainUrl/#popular" to "Популярне",
         "$mainUrl/#premieres" to "Прем'єри",
         "$mainUrl/#expected" to "Очікуване"
-)
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
