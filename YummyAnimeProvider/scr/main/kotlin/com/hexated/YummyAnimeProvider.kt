@@ -8,7 +8,7 @@ class YummyAnimeProvider : MainAPI() {
 
     override var name = "YummyAnime"
     override var mainUrl = "https://api.yummyanime.tv"
-    override var lang = "ru"
+    override var lang = "ua"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Anime)
 
