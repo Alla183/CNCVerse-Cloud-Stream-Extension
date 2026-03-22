@@ -1,16 +1,13 @@
-version = 2
+version = 3
 
 cloudstream {
-    language = "uk"
+    language = "ua"
     description = "YummyAnime - Anime"
     authors = listOf("Alla183")
 
     status = 1
 
-    tvTypes = listOf(
-        "TvSeries",
-        "Anime"
-    )
+    tvTypes = listOf("Anime)
 
     iconUrl = "https://yummyanime.tv/favicon.ico"
 }
