@@ -1,7 +1,7 @@
 version = 3
 
 cloudstream {
-    language = "ua"
+    language = "uk"
     description = "YummyAnime - Anime"
     authors = listOf("Alla183")
 
