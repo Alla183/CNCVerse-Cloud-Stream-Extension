@@ -7,7 +7,7 @@ cloudstream {
 
     status = 1
 
-    tvTypes = listOf("Anime)
+    tvTypes = listOf("Anime")
 
     iconUrl = "https://yummyanime.tv/favicon.ico"
 }
