@@ -1,8 +1,11 @@
-package com.yourname.yummyanime
+package com.hexated
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import org.jsoup.nodes.Element
 import org.json.JSONObject
+import com.lagradost.cloudstream3.CommonActivity.showToast
+import com.lagradost.cloudstream3.utils.M3u8Helper
 
 class YummyAnimeProvider : MainAPI() {
 
