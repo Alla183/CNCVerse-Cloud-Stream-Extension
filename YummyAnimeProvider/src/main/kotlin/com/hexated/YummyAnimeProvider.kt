@@ -120,8 +120,8 @@ class YummyAnimeProvider : MainAPI() {
             posterUrl = obj.optJSONObject("poster")?.optString("original")
             plot = obj.optString("description")
 
-            this.episodes = mapOf(
-                DubStatus.Subbed to episodes
+            this.episodes = mutableMapOf(
+                DubStatus.Subbed to episodes.toList()
             )
         }
     }
