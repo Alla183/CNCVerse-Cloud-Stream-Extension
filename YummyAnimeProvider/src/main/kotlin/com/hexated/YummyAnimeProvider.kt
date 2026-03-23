@@ -7,7 +7,7 @@ import org.json.JSONObject
 class YummyAnimeProvider : MainAPI() {
 
     override var name = "YummyAnime"
-    override var mainUrl = "https://yummyanime.tv"
+    override var mainUrl = "https://api.yani.tv"
     override var lang = "uk"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Anime)
@@ -16,8 +16,10 @@ class YummyAnimeProvider : MainAPI() {
 
     // 🔥 headers (щоб API не давав пусто)
     private val headers = mapOf(
+        "Accept" to "application/json",
+        "Lang" to "ru",
         "User-Agent" to "Mozilla/5.0",
-        "Referer" to "https://yummyanime.tv/"
+        "X-Application" to "ТУТ_ТВОЙ_PUBLIC_TOKEN"
     )
 
     // =========================
