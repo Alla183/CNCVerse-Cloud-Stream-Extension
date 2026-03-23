@@ -14,6 +14,12 @@ class YummyAnimeProvider : MainAPI() {
 
     private val pageSize = 20
 
+    // 🔥 headers (щоб API не давав пусто)
+    private val headers = mapOf(
+        "User-Agent" to "Mozilla/5.0",
+        "Referer" to "https://yummyanime.tv/"
+    )
+
     // =========================
     // 🔥 Main page
     // =========================
@@ -24,7 +30,7 @@ class YummyAnimeProvider : MainAPI() {
 
         val url = "$mainUrl/anime?limit=$pageSize&offset=${(page - 1) * pageSize}"
 
-        val json = app.get(url).parsedSafe<JSONObject>()
+        val json = app.get(url, headers = headers).parsedSafe<JSONObject>()
         val array = json?.optJSONArray("response")
 
         val list = mutableListOf<SearchResponse>()
@@ -57,7 +63,7 @@ class YummyAnimeProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/anime?q=$query"
 
-        val json = app.get(url).parsedSafe<JSONObject>()
+        val json = app.get(url, headers = headers).parsedSafe<JSONObject>()
         val array = json?.optJSONArray("response")
 
         val list = mutableListOf<SearchResponse>()
@@ -82,10 +88,14 @@ class YummyAnimeProvider : MainAPI() {
     }
 
     // =========================
-    // 📄 Load
+    // 📄 Load (деталі + серії)
     // =========================
     override suspend fun load(url: String): LoadResponse {
-        val json = app.get("$url?need_videos=true").parsedSafe<JSONObject>()
+        val json = app.get(
+            "$url?need_videos=true",
+            headers = headers
+        ).parsedSafe<JSONObject>()
+
         val obj = json?.optJSONObject("response")
             ?: throw Exception("No data")
 
@@ -101,9 +111,7 @@ class YummyAnimeProvider : MainAPI() {
 
                 if (iframe.isNotBlank()) {
                     episodes.add(
-                        newEpisode(
-                            iframe
-                        ) {
+                        newEpisode(iframe) {
                             name = "Серия $number"
                             episode = number.toIntOrNull()
                         }
@@ -127,7 +135,7 @@ class YummyAnimeProvider : MainAPI() {
     }
 
     // =========================
-    // 🎥 Links
+    // 🎥 Video links
     // =========================
     override suspend fun loadLinks(
         data: String,
