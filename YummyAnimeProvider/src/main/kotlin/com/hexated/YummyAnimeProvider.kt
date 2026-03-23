@@ -2,10 +2,7 @@ package com.hexated
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.jsoup.nodes.Element
 import org.json.JSONObject
-import com.lagradost.cloudstream3.CommonActivity.showToast
-import com.lagradost.cloudstream3.utils.M3u8Helper
 
 class YummyAnimeProvider : MainAPI() {
 
@@ -17,30 +14,8 @@ class YummyAnimeProvider : MainAPI() {
 
     private val pageSize = 20
 
-    // 🔐 встав свої токени (якщо потрібні)
-    private val publicToken = ""
-    private val privateToken = ""
-
     // =========================
-    // 🌐 Headers
-    // =========================
-    override fun getRequestCreator(): RequestCreator {
-        return {
-            addHeader("Accept", "application/json, */*")
-            addHeader("Lang", "ru")
-
-            if (publicToken.isNotBlank()) {
-                addHeader("X-Application", publicToken)
-            }
-
-            if (privateToken.isNotBlank()) {
-                addHeader("Authorization", "Yummy $privateToken")
-            }
-        }
-    }
-
-    // =========================
-    // 🔥 Головна сторінка
+    // 🔥 Main page
     // =========================
     override suspend fun getMainPage(
         page: Int,
@@ -50,97 +25,109 @@ class YummyAnimeProvider : MainAPI() {
         val url = "$mainUrl/anime?limit=$pageSize&offset=${(page - 1) * pageSize}"
 
         val json = app.get(url).parsedSafe<JSONObject>()
-        val array = json?.optJSONArray("response") ?: return HomePageResponse(emptyList())
+        val array = json?.optJSONArray("response")
 
-        val list = array.mapNotNull {
-            val obj = it as? JSONObject ?: return@mapNotNull null
+        val list = mutableListOf<SearchResponse>()
 
-            newAnimeSearchResponse(
-                obj.optString("title"),
-                "$mainUrl/anime/${obj.optString("anime_url")}",
-                TvType.Anime
-            ) {
-                posterUrl = obj.optJSONObject("poster")?.optString("original")
+        if (array != null) {
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+
+                list.add(
+                    newAnimeSearchResponse(
+                        obj.optString("title"),
+                        "$mainUrl/anime/${obj.optString("anime_url")}",
+                        TvType.Anime
+                    ) {
+                        posterUrl = obj.optJSONObject("poster")?.optString("original")
+                    }
+                )
             }
         }
 
-        return HomePageResponse(
+        return newHomePageResponse(
             listOf(HomePageList("Популярное", list)),
-            hasNext = list.size >= pageSize
+            list.size >= pageSize
         )
     }
 
     // =========================
-    // 🔎 Пошук
+    // 🔎 Search
     // =========================
     override suspend fun search(query: String): List<SearchResponse> {
-        if (query.isBlank()) return emptyList()
-
-        val url = "$mainUrl/anime?q=${query}"
+        val url = "$mainUrl/anime?q=$query"
 
         val json = app.get(url).parsedSafe<JSONObject>()
-        val array = json?.optJSONArray("response") ?: return emptyList()
+        val array = json?.optJSONArray("response")
 
-        return array.mapNotNull {
-            val obj = it as? JSONObject ?: return@mapNotNull null
+        val list = mutableListOf<SearchResponse>()
 
-            newAnimeSearchResponse(
-                obj.optString("title"),
-                "$mainUrl/anime/${obj.optString("anime_url")}",
-                TvType.Anime
-            ) {
-                posterUrl = obj.optJSONObject("poster")?.optString("original")
+        if (array != null) {
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+
+                list.add(
+                    newAnimeSearchResponse(
+                        obj.optString("title"),
+                        "$mainUrl/anime/${obj.optString("anime_url")}",
+                        TvType.Anime
+                    ) {
+                        posterUrl = obj.optJSONObject("poster")?.optString("original")
+                    }
+                )
             }
         }
+
+        return list
     }
 
     // =========================
-    // 📄 Деталі + епізоди
+    // 📄 Load
     // =========================
     override suspend fun load(url: String): LoadResponse {
         val json = app.get("$url?need_videos=true").parsedSafe<JSONObject>()
         val obj = json?.optJSONObject("response")
-            ?: throw Exception("No response")
+            ?: throw Exception("No data")
 
-        val title = obj.optString("title")
-        val description = obj.optString("description")
-        val poster = obj.optJSONObject("poster")?.optString("original")
+        val episodes = mutableListOf<Episode>()
+        val videos = obj.optJSONArray("videos")
 
-        val videos = obj.optJSONArray("videos") ?: throw Exception("No videos")
+        if (videos != null) {
+            for (i in 0 until videos.length()) {
+                val v = videos.getJSONObject(i)
 
-        val episodesMap = mutableMapOf<String, MutableList<String>>()
+                val number = v.optString("number")
+                val iframe = v.optString("iframe")
 
-        videos.forEach {
-            val v = it as JSONObject
-            val number = v.optString("number")
-            val iframe = v.optString("iframe")
-
-            if (number.isNotBlank() && iframe.isNotBlank()) {
-                episodesMap.getOrPut(number) { mutableListOf() }.add(iframe)
+                if (iframe.isNotBlank()) {
+                    episodes.add(
+                        newEpisode(
+                            iframe
+                        ) {
+                            name = "Серия $number"
+                            episode = number.toIntOrNull()
+                        }
+                    )
+                }
             }
         }
 
-        val episodes = episodesMap.map { (num, iframes) ->
-            Episode(
-                data = iframes.first(), // беремо перший (далі extractor розрулить)
-                name = "Серия $num",
-                episode = num.toIntOrNull()
-            )
-        }.sortedByDescending { it.episode }
-
         return newAnimeLoadResponse(
-            title,
+            obj.optString("title"),
             url,
             TvType.Anime
         ) {
-            plot = description
-            posterUrl = poster
-            this.episodes = episodes
+            posterUrl = obj.optJSONObject("poster")?.optString("original")
+            plot = obj.optString("description")
+
+            this.episodes = mapOf(
+                DubStatus.Subbed to episodes
+            )
         }
     }
 
     // =========================
-    // 🎥 Відео
+    // 🎥 Links
     // =========================
     override suspend fun loadLinks(
         data: String,
@@ -149,14 +136,7 @@ class YummyAnimeProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        // YummyAnime використовує Kodik → Cloudstream вже вміє його
-        loadExtractor(
-            data,
-            mainUrl,
-            subtitleCallback,
-            callback
-        )
-
+        loadExtractor(data, mainUrl, subtitleCallback, callback)
         return true
     }
 }
