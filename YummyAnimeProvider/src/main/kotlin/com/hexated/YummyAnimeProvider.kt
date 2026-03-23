@@ -16,10 +16,9 @@ class YummyAnimeProvider : MainAPI() {
 
     // 🔥 headers (щоб API не давав пусто)
     private val headers = mapOf(
-        "Accept" to "application/json",
-        "Lang" to "ru",
-        "User-Agent" to "Mozilla/5.0",
-        "X-Application" to "ТУТ_ТВОЙ_PUBLIC_TOKEN"
+        "X-Application" to "_bqmrqz3wozbzdiq",
+        "Accept" to "image/avif,image/webp,*/*",
+        "Lang" to "ru"
     )
 
     // =========================
