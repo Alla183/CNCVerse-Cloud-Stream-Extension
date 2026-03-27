@@ -23,5 +23,5 @@ cloudstream {
     status = 1 // will be 3 if unspecified
     tvTypes = listOf("Anime")
 
-    iconUrl = "https://site.yummyani.me/favicon.ico""
+    iconUrl = "https://site.yummyani.me/favicon.ico"
 }
