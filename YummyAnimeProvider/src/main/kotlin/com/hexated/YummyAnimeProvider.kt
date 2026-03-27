@@ -47,26 +47,27 @@ class YummyAnimeProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-        val url = "$mainUrl/search?word=$encodedQuery"
-        val doc = app.get(url).document
+        val url = "https://api.yani.tv/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&offset=0&limit=20"
 
-    // Контейнер для всіх результатів пошуку
-        val container = doc.selectFirst("div.grid-container.animes-search") ?: return emptyList()
+        val headers = mapOf(
+            "X-Application" to "i0zejgswfnwup27a",
+            "Accept" to "application/json",
+            "Lang" to "ru"
+        )
 
-        return container.select("div.anime-column").mapNotNull { element ->
-            val link = element.selectFirst("a.image-block")?.attr("href") ?: return@mapNotNull null
-            val poster = element.selectFirst("img")?.attr("src") ?: ""
-            val title = element.selectFirst("a.anime-title")?.text() ?: return@mapNotNull null
+        val response = app.get(url, headers).parsedAsJsonObject() // предполагаемая функция для JSON
 
+        return response["response"]?.jsonArray?.mapNotNull { anime ->
+            val obj = anime.jsonObject
             newAnimeSearchResponse(
-                title,
-                mainUrl + link,
+                obj["title"]?.jsonPrimitive?.content ?: return@mapNotNull null,
+                "https://site.yummyani.me/catalog/item/${obj["anime_url"]?.jsonPrimitive?.content}",
                 TvType.Anime
             ) {
-                posterUrl = fixUrl(poster)
+                posterUrl = obj["poster"]?.jsonObject?.get("fullsize")?.jsonPrimitive?.content ?: ""
+                description = obj["description"]?.jsonPrimitive?.content ?: ""
             }
-        }
+        } ?: emptyList()
     }
 
     // =========================
