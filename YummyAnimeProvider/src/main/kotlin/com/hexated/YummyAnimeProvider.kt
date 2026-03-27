@@ -72,14 +72,18 @@ class YummyAnimeProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse {
         val doc = app.get(url).document
 
-        val title = doc.selectFirst("h1")?.text() ?: "No title"
-        val poster = doc.selectFirst("img")?.attr("src")
+    // Назва
+        val title = doc.selectFirst("div.titles > h1")?.text() ?: "No title"
 
-        // 🔥 тут треба буде знайти iframe або список серій
-        val iframe = doc.selectFirst("iframe")?.attr("src")
+    // Обкладинка
+        val poster = doc.selectFirst("div.poster-block img")?.attr("src") ?: ""
 
+    // Опис
+        val plot = doc.selectFirst("p[itemprop=description]")?.text()
+
+    // Серії (на даний момент можна додати iframe як приклад)
         val episodes = mutableListOf<Episode>()
-
+        val iframe = doc.selectFirst("iframe")?.attr("src")
         if (!iframe.isNullOrBlank()) {
             episodes.add(
                 newEpisode(iframe) {
@@ -94,11 +98,10 @@ class YummyAnimeProvider : MainAPI() {
             url,
             TvType.Anime
         ) {
-            posterUrl = fixUrl(poster ?: "")
-            plot = doc.selectFirst(".description")?.text()
-
+            posterUrl = fixUrl(poster)
+            this.plot = plot
             this.episodes = mutableMapOf(
-                DubStatus.Subbed to episodes
+            DubStatus.Subbed to episodes
             )
         }
     }
