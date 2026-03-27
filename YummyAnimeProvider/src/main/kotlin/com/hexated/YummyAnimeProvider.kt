@@ -97,40 +97,47 @@ class YummyAnimeProvider : MainAPI() {
     // =========================
     // 📄 Деталі + епізоди
     // =========================
+
+    data class AnimeDetails(
+        @JsonProperty("episodes") val episodes: List<Episode>? = null
+    )
+
+    data class Episode(
+        @JsonProperty("id") val id: Int? = null,
+        @JsonProperty("episode") val episode: Int? = null,
+        @JsonProperty("title") val title: String? = null
+    )
+    
     override suspend fun load(url: String): LoadResponse {
-        val doc = app.get(url).document
+        val slug = url.substringAfterLast("/")
 
-    // Назва
-        val title = doc.selectFirst("div.titles > h1")?.text() ?: "No title"
+        val apiUrl = "https://api.yani.tv/anime/$slug"
 
-    // Обкладинка
-        val poster = doc.selectFirst("div.poster-block img")?.attr("src") ?: ""
+        val headers = mapOf(
+            "X-Application" to "i0zejgswfnwup27a",
+            "Accept" to "application/json",
+            "Lang" to "ru"
+        )
 
-    // Опис
-        val plot = doc.selectFirst("p[itemprop=description]")?.text()
+        val responseBody = app.get(apiUrl, headers).toString()
 
-    // Серії (на даний момент можна додати iframe як приклад)
-        val episodes = mutableListOf<Episode>()
-        val iframe = doc.selectFirst("iframe")?.attr("src")
-        if (!iframe.isNullOrBlank()) {
-            episodes.add(
-                newEpisode(iframe) {
-                    name = "Episode 1"
-                    episode = 1
-                }
-            )
-        }
+        val mapper = jacksonObjectMapper()
+        val data = mapper.readValue<AnimeDetails>(responseBody)
+
+        val episodes = data.episodes?.map { ep ->
+            newEpisode(
+               data = ep.id.toString(),
+            ) {
+                name = "Episode ${ep.episode}"
+            }
+        } ?: emptyList()
 
         return newAnimeLoadResponse(
-            title,
-            url,
-            TvType.Anime
+            name = slug,
+            url = url,
+            type = TvType.Anime
         ) {
-            posterUrl = fixUrl(poster)
-            this.plot = plot
-            this.episodes = mutableMapOf(
-            DubStatus.Subbed to episodes
-            )
+            this.episodes = episodes
         }
     }
 
@@ -144,7 +151,37 @@ class YummyAnimeProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        loadExtractor(data, mainUrl, subtitleCallback, callback)
+        val episodeId = data
+
+        val url = "https://api.yani.tv/episode/$episodeId"
+
+        val headers = mapOf(
+            "X-Application" to "i0zejgswfnwup27a",
+            "Accept" to "application/json"
+        )
+
+        val response = app.get(url, headers).toString()
+
+        val json = JSONObject(response)
+
+        val streams = json.optJSONArray("streams") ?: return false
+
+        for (i in 0 until streams.length()) {
+            val stream = streams.optJSONObject(i) ?: continue
+
+            val videoUrl = stream.optString("url") ?: continue
+            val quality = stream.optString("quality") ?: "HD"
+
+            callback.invoke(
+                newExtractorLink(
+                    source = "YummyAnime",
+                    name = "YummyAnime $quality",
+                    url = videoUrl,
+                    type = INFER_TYPE
+                )
+            )
+        }
+
         return true
     }
 }
