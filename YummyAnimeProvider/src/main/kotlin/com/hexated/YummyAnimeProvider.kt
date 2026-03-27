@@ -132,7 +132,10 @@ class YummyAnimeProvider : MainAPI() {
     // =========================
     // 📄 Деталі + епізоди
     // =========================
-
+    data class AnimeResponse(
+        @JsonProperty("response") val response: AnimeDetails? = null
+    )
+    
     data class AnimeDetails(
         @JsonProperty("episodes") val episodes: List<Episode>? = null
     )
@@ -157,7 +160,9 @@ class YummyAnimeProvider : MainAPI() {
         val responseBody = app.get(apiUrl, headers).toString()
 
         val mapper = jacksonObjectMapper()
-        val data = mapper.readValue<AnimeDetails>(responseBody)
+        val apiResponse = mapper.readValue<AnimeResponse>(responseBody)
+
+        val data = apiResponse.response
 
         val episodes = data.episodes?.map { ep ->
             newEpisode(
