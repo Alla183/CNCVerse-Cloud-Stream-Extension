@@ -6,10 +6,10 @@ import org.jsoup.nodes.Element
 import org.json.JSONObject
 import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
+import org.json.Json
+import org.json.jsonObject
+import org.json.jsonArray
+import org.jsonPrimitive
 
 
 class YummyAnimeProvider : MainAPI() {
