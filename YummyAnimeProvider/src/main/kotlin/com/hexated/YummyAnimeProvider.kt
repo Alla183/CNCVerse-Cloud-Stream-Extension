@@ -59,19 +59,30 @@ class YummyAnimeProvider : MainAPI() {
             "Lang" to "ru"
         )
 
-        val response = app.get(url, headers).parsedAsJsonObject() // предполагаемая функция для JSON
+    // Получаем строку ответа
+        val responseBody = app.get(url, headers)
 
-        return response["response"]?.jsonArray?.mapNotNull { anime ->
+    // Парсим JSON через Kotlin Serialization
+        val json = Json.parseToJsonElement(responseBody).jsonObject
+
+        val responseArray = json["response"]?.jsonArray ?: return emptyList()
+
+        return responseArray.mapNotNull { anime ->
             val obj = anime.jsonObject
+            val title = obj["title"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            val animeUrl = obj["anime_url"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            val poster = obj["poster"]?.jsonObject?.get("fullsize")?.jsonPrimitive?.content ?: ""
+            val description = obj["description"]?.jsonPrimitive?.content ?: ""
+
             newAnimeSearchResponse(
-                obj["title"]?.jsonPrimitive?.content ?: return@mapNotNull null,
-                "https://site.yummyani.me/catalog/item/${obj["anime_url"]?.jsonPrimitive?.content}",
+                title,
+                "https://site.yummyani.me/catalog/item/$animeUrl",
                 TvType.Anime
             ) {
-                posterUrl = obj["poster"]?.jsonObject?.get("fullsize")?.jsonPrimitive?.content ?: ""
-                description = obj["description"]?.jsonPrimitive?.content ?: ""
+                this.posterUrl = poster
+                this.description = description
             }
-        } ?: emptyList()
+        }
     }
 
     // =========================
