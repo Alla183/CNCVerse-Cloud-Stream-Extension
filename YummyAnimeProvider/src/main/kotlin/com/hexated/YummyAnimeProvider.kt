@@ -1,7 +1,7 @@
 package com.hexated
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.models.*
+import com.lagradost.cloudstream3.model.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 import org.json.JSONObject
@@ -176,7 +176,7 @@ class YummyAnimeProvider : MainAPI() {
         val episodes = mutableListOf<Episode>()
         try {
         // Формуємо API URL
-            val episodeUrl = url.removePrefix(baseUrl)
+            val episodeUrl = url.removePrefix(mainUrl)
             val urlParts = episodeUrl.split("/") // наприклад "vertex-force/episodes"
             if (urlParts.size < 2) return newAnimeLoadResponse(title, url) {
                 this.posterUrl = poster
@@ -247,7 +247,7 @@ class YummyAnimeProvider : MainAPI() {
                                 ExtractorLink(
                                     name = "Kodik - ${video.quality}",
                                     url = video.url,
-                                    referer = baseUrl,
+                                    referer = mainUrl,
                                     isM3u8 = video.url.contains(".m3u8")
                                 )
                             )
@@ -269,7 +269,7 @@ class YummyAnimeProvider : MainAPI() {
         val videos = mutableListOf<Video>()
         try {
             val client = OkHttpClient()
-            val headers = Headers.Builder().add("Referer", baseUrl).build()
+            val headers = Headers.Builder().add("Referer", mainUrl).build()
             val request = Request.Builder().url(embedUrl).headers(headers).build()
             val response = client.newCall(request).execute()
             val html = response.body?.string() ?: return videos
@@ -277,7 +277,7 @@ class YummyAnimeProvider : MainAPI() {
             val kodikMatch = Regex("\"url\":\"([^\"]+)\"").find(html)
             kodikMatch?.groupValues?.getOrNull(1)?.let { url ->
                 val decodedUrl = url.replace("\\u0026", "&")
-                val absoluteUrl = if (decodedUrl.startsWith("http")) decodedUrl else "$baseUrl$decodedUrl"
+                val absoluteUrl = if (decodedUrl.startsWith("http")) decodedUrl else "$mainUrl$decodedUrl"
                 videos.add(
                     Video(
                         url = absoluteUrl,
