@@ -190,44 +190,77 @@ class YummyAnimeProvider : MainAPI() {
     // =========================
     // 🎥 Відео
     // =========================
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
+    override suspend fun loadLinks(episode: Episode): List<Video> {
+        val videos = mutableListOf<Video>()
 
-        val episodeId = data
+        try {
+            val urlParts = episode.url.split("/")
+            if (urlParts.size < 4) return videos
 
-        val url = "https://api.yani.tv/episode/$episodeId"
+            val animeSlug = urlParts[0]
+            val episodeId = urlParts[3]
+            val apiUrl = "https://api.yani.tv/anime/$animeSlug/episodes/$episodeId/players"
 
-        val headers = mapOf(
-            "X-Application" to "i0zejgswfnwup27a",
-            "Accept" to "application/json"
-        )
+            println("Fetching Kodik videos for episode: ${episode.name}")
+            println("API URL: $apiUrl")
 
-        val response = app.get(url, headers).toString()
+            val response = app.get(apiUrl)
+            val jsonResponse = response.toString()
+            println("Video response: $jsonResponse")
 
-        val json = JSONObject(response)
+            val playersResponse = gson.fromJson(jsonResponse, PlayersResponse::class.java)
+            playersResponse.data?.forEach { player ->
+                player.embeds?.forEach { embed ->
+                    val embedUrl = embed.url ?: return@forEach
+                // Використовуємо лише Kodik
+                    if (embedUrl.contains("kodik", true)) {
+                        println("Found Kodik embed: $embedUrl")
+                        videos.addAll(extractKodik(embedUrl))
+                    }
+                }
+            }
 
-        val streams = json.optJSONArray("streams") ?: return false
-
-        for (i in 0 until streams.length()) {
-            val stream = streams.optJSONObject(i) ?: continue
-
-            val videoUrl = stream.optString("url") ?: continue
-            val quality = stream.optString("quality") ?: "HD"
-
-            callback.invoke(
-                newExtractorLink(
-                    source = "YummyAnime",
-                    name = "YummyAnime $quality",
-                    url = videoUrl,
-                    type = INFER_TYPE
-                )
-            )
+        } catch (e: Exception) {
+            println("Error loading Kodik videos: ${e.message}")
         }
 
-        return true
+        return videos
+    }
+
+// =========================
+// 🔧 Extract Kodik Video
+// =========================
+    private fun extractKodik(embedUrl: String): List<Video> {
+        val videos = mutableListOf<Video>()
+        try {
+            val headers = Headers.Builder()
+                .add("Referer", "https://yummyani.me") // обов’язково, щоб Kodik відпустив запит
+                .build()
+
+            val response = client.newCall(GET(embedUrl, headers)).execute()
+            val html = response.body?.string() ?: return videos
+
+        // Витягаємо URL відео з HTML
+            val kodikMatch = Regex("\"url\":\"([^\"]+)\"").find(html)
+            kodikMatch?.groupValues?.getOrNull(1)?.let { url ->
+                val decodedUrl = url.replace("\\u0026", "&")
+                val absoluteUrl = if (decodedUrl.startsWith("http")) decodedUrl else "https://kodik.info$decodedUrl"
+
+                println("Kodik video URL: $absoluteUrl")
+
+                videos.add(
+                    Video(
+                        url = absoluteUrl,
+                        quality = "Kodik - HD",
+                        videoUrl = absoluteUrl,
+                    )
+                )
+            }
+
+        } catch (e: Exception) {
+            println("Error extracting Kodik video: ${e.message}")
+        }
+
+        return videos
     }
 }
