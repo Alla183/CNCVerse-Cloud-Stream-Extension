@@ -132,56 +132,37 @@ class YummyAnimeProvider : MainAPI() {
     // =========================
     // 📄 Деталі + епізоди
     // =========================
-    data class AnimeResponse(
-        @JsonProperty("response") val response: AnimeDetails? = null
-    )
-    
-    data class AnimeDetails(
-        @JsonProperty("episodes") val episodes: List<Episode>? = null
-    )
-
-    data class Episode(
-        @JsonProperty("id") val id: Int? = null,
-        @JsonProperty("episode") val episode: Int? = null,
-        @JsonProperty("title") val title: String? = null
-    )
-    
     override suspend fun load(url: String): LoadResponse {
-        val slug = url.substringAfterLast("/")
+        val doc = app.get(url).document
 
-        val apiUrl = "https://api.yani.tv/anime/$slug"
+    // Назва
+        val title = doc.selectFirst("div.titles > h1")?.text() ?: "No title"
 
-        val headers = mapOf(
-            "X-Application" to "i0zejgswfnwup27a",
-            "Accept" to "application/json",
-            "Lang" to "ru"
-        )
+    // Обкладинка
+        val poster = doc.selectFirst("div.poster-block img")?.attr("src") ?: ""
 
-        val responseBody = app.get(apiUrl, headers).toString()
+    // Опис
+        val plot = doc.selectFirst("p[itemprop=description]")?.text()
 
-        val mapper = jacksonObjectMapper()
-        val apiResponse = mapper.readValue<AnimeResponse>(responseBody)
-
-        val data = apiResponse.response
-
-        val data = res.response ?: run {
-            println("❌ No response from API")
-            return null
+    // Серії (на даний момент можна додати iframe як приклад)
+        val episodes = mutableListOf<Episode>()
+        val iframe = doc.selectFirst("iframe")?.attr("src")
+        if (!iframe.isNullOrBlank()) {
+            episodes.add(
+                newEpisode(iframe) {
+                    name = "Episode 1"
+                    episode = 1
+                }
+            )
         }
 
-        val episodes = data.episodes?.map { ep ->
-            newEpisode(
-                data = ep.id.toString()
-            ) {
-                name = "Episode ${ep.episode}"
-            }
-        } ?: emptyList())
-
         return newAnimeLoadResponse(
-            name = slug,
-            url = url,
-            type = TvType.Anime
+            title,
+            url,
+            TvType.Anime
         ) {
+            posterUrl = fixUrl(poster)
+            this.plot = plot
             this.episodes = mutableMapOf(
                 DubStatus.Subbed to episodes
             )
