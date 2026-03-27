@@ -6,7 +6,7 @@ import org.jsoup.nodes.Element
 import org.json.JSONObject
 import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.utils.encodeURLParameter
+
 
 class YummyAnimeProvider : MainAPI() {
 
