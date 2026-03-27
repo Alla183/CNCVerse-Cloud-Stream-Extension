@@ -60,29 +60,34 @@ class YummyAnimeProvider : MainAPI() {
         )
 
     // Получаем строку ответа
-        val responseBody = app.get(url, headers)
+        val responseBody = app.get(url, headers).toString()
 
-    // Парсим JSON через Kotlin Serialization
-        val json = Json.parseToJsonElement(responseBody).jsonObject
+    // Парсим JSON через org.json
+        val json = JSONObject(responseBody)
+        val responseArray = json.optJSONArray("response") ?: return emptyList()
 
-        val responseArray = json["response"]?.jsonArray ?: return emptyList()
+        val results = mutableListOf<SearchResponse>()
 
-        return responseArray.mapNotNull { anime ->
-            val obj = anime.jsonObject
-            val title = obj["title"]?.jsonPrimitive?.content ?: return@mapNotNull null
-            val animeUrl = obj["anime_url"]?.jsonPrimitive?.content ?: return@mapNotNull null
-            val poster = obj["poster"]?.jsonObject?.get("fullsize")?.jsonPrimitive?.content ?: ""
-            val description = obj["description"]?.jsonPrimitive?.content ?: ""
+        for (i in 0 until responseArray.length()) {
+            val obj = responseArray.optJSONObject(i) ?: continue
+            val title = obj.optString("title", null) ?: continue
+            val animeUrl = obj.optString("anime_url", null) ?: continue
+            val poster = obj.optJSONObject("poster")?.optString("fullsize") ?: ""
+            val description = obj.optString("description", "")
 
-            newAnimeSearchResponse(
-                title,
-                "https://site.yummyani.me/catalog/item/$animeUrl",
-                TvType.Anime
-            ) {
-                this.posterUrl = poster
-                this.description = description
-            }
+            results.add(
+                newAnimeSearchResponse(
+                    title,
+                    "https://site.yummyani.me/catalog/item/$animeUrl",
+                    TvType.Anime
+                ) {
+                    this.posterUrl = poster
+                    this.description = description
+                }
+            )
         }
+
+        return results
     }
 
     // =========================
