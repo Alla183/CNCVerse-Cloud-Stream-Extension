@@ -103,6 +103,7 @@ class YummyAnimeProvider : MainAPI() {
                 val posterRaw = obj.optJSONObject("poster")?.optString("fullsize") ?: ""
                 val poster = if (posterRaw.startsWith("//")) "https:$posterRaw" else posterRaw
 
+                println("POSTER FIXED: $poster")
                 println("ITEM: $title | $animeUrl")
 
                 if (title.isBlank() || animeUrl.isBlank()) continue
