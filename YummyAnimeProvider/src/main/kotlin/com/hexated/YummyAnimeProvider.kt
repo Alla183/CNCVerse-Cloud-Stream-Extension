@@ -63,7 +63,7 @@ class YummyAnimeProvider : MainAPI() {
         val responseBody = app.get(url, headers).toString()
 
     // Парсим JSON через org.json
-        val json = JSONObject(responseBody)
+        val json = org.json.JSONObject(responseBody)
         val responseArray = json.optJSONArray("response") ?: return emptyList()
 
         val results = mutableListOf<SearchResponse>()
