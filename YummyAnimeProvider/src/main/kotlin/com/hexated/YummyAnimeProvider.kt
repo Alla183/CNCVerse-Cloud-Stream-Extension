@@ -47,14 +47,17 @@ class YummyAnimeProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val encodedQuery = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8.toString())
+        val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
         val url = "$mainUrl/search?word=$encodedQuery"
         val doc = app.get(url).document
 
-        return doc.select("div.anime-column").mapNotNull { element ->
+    // Контейнер для всіх результатів пошуку
+        val container = doc.selectFirst("div.grid-container.animes-search") ?: return emptyList()
+
+        return container.select("div.anime-column").mapNotNull { element ->
             val link = element.selectFirst("a.image-block")?.attr("href") ?: return@mapNotNull null
             val poster = element.selectFirst("img")?.attr("src") ?: ""
-            val title = element.selectFirst(".anime-title")?.text() ?: return@mapNotNull null
+            val title = element.selectFirst("a.anime-title")?.text() ?: return@mapNotNull null
 
             newAnimeSearchResponse(
                 title,
