@@ -9,6 +9,7 @@ import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.google.gson.Gson
 
 
 class YummyAnimeProvider : MainAPI() {
@@ -144,15 +145,15 @@ class YummyAnimeProvider : MainAPI() {
         val poster = doc.selectFirst("div.poster-block img")?.attr("src") ?: ""
 
     // Опис
-        val plot = doc.selectFirst("p[itemprop=description]")?.text()
+        val plot = doc.selectFirst("p[itemprop=description]")?.text() ?: ""
 
-    // Серії (на даний момент можна додати iframe як приклад)
         val episodes = mutableListOf<Episode>()
-        try {
-            val urlParts = url.split("/") // розбиваємо URL на частини
-            if (urlParts.isEmpty()) return LoadResponse.error("Invalid URL")
 
-            val animeSlug = urlParts.last() // наприклад "vertex-force"
+        try {
+            val urlParts = url.split("/")
+            if (urlParts.isEmpty()) return newAnimeLoadResponse(title, url, TvType.Anime)
+
+            val animeSlug = urlParts.last()
             val apiUrl = "https://api.yani.tv/anime/$animeSlug/episodes"
 
             println("Fetching episodes from: $apiUrl")
@@ -161,30 +162,25 @@ class YummyAnimeProvider : MainAPI() {
             val jsonResponse = response.toString()
             println("Response: $jsonResponse")
 
-        // Десеріалізуємо JSON
+            val gson = Gson()
             val episodesResponse = gson.fromJson(jsonResponse, EpisodesResponse::class.java)
             episodesResponse.data?.forEach { ep ->
-                val episode = Episode(
-                    name = ep.title ?: "Episode ${ep.number ?: "?"}",
-                    url = "$animeSlug/episodes/${ep.id ?: ""}",
-                    episodeNumber = ep.number?.toFloat() ?: 0f
+                val episode = newEpisode(
+                    data = "${ep.id ?: ""}",
+                    name = ep.title ?: "Episode ${ep.number ?: "?"}"
                 )
-                println("Found episode: ${episode.name} | URL: ${episode.url}")
+                println("Found episode: ${episode.name} | data: ${episode.data}")
                 episodes.add(episode)
             }
-
         } catch (e: Exception) {
             println("Error loading episodes: ${e.message}")
         }
 
-    // Повертаємо LoadResponse
-        return newAnimeLoadResponse(
-            title = title,
-            url = url,
-            posterUrl = poster,
-            plot = plot,
-            episodes = episodes
-        )
+        return newAnimeLoadResponse(title, url, TvType.Anime) {
+            this.posterUrl = poster
+            this.description = plot
+            this.episodes = episodes
+        }
     }
 
     // =========================
