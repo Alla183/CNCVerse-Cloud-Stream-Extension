@@ -148,27 +148,43 @@ class YummyAnimeProvider : MainAPI() {
 
     // Серії (на даний момент можна додати iframe як приклад)
         val episodes = mutableListOf<Episode>()
-        val iframe = doc.selectFirst("iframe")?.attr("src")
-        if (!iframe.isNullOrBlank()) {
-            episodes.add(
-                newEpisode(iframe) {
-                    name = "Episode 1"
-                    episode = 1
-                }
-            )
+        try {
+            val urlParts = url.split("/") // розбиваємо URL на частини
+            if (urlParts.isEmpty()) return LoadResponse.error("Invalid URL")
+
+            val animeSlug = urlParts.last() // наприклад "vertex-force"
+            val apiUrl = "https://api.yani.tv/anime/$animeSlug/episodes"
+
+            println("Fetching episodes from: $apiUrl")
+
+            val response = app.get(apiUrl)
+            val jsonResponse = response.toString()
+            println("Response: $jsonResponse")
+
+        // Десеріалізуємо JSON
+            val episodesResponse = gson.fromJson(jsonResponse, EpisodesResponse::class.java)
+            episodesResponse.data?.forEach { ep ->
+                val episode = Episode(
+                    name = ep.title ?: "Episode ${ep.number ?: "?"}",
+                    url = "$animeSlug/episodes/${ep.id ?: ""}",
+                    episodeNumber = ep.number?.toFloat() ?: 0f
+                )
+                println("Found episode: ${episode.name} | URL: ${episode.url}")
+                episodes.add(episode)
+            }
+
+        } catch (e: Exception) {
+            println("Error loading episodes: ${e.message}")
         }
 
+    // Повертаємо LoadResponse
         return newAnimeLoadResponse(
-            title,
-            url,
-            TvType.Anime
-        ) {
-            posterUrl = fixUrl(poster)
-            this.plot = plot
-            this.episodes = mutableMapOf(
-                DubStatus.Subbed to episodes
-            )
-        }
+            title = title,
+            url = url,
+            posterUrl = poster,
+            plot = plot,
+            episodes = episodes
+        )
     }
 
     // =========================
