@@ -66,7 +66,8 @@ class YummyAnimeProvider : MainAPI() {
     )
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "https://api.yani.tv/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&offset=0&limit=20"
+        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+        val url = "https://api.yani.tv/search?q=$encoded&offset=0&limit=20"
 
         val headers = mapOf(
             "X-Application" to "i0zejgswfnwup27a",
@@ -74,24 +75,58 @@ class YummyAnimeProvider : MainAPI() {
             "Lang" to "ru"
         )
 
-        val responseBody = app.get(url, headers).toString()
-        val mapper = jacksonObjectMapper()
-        val apiResponse = mapper.readValue<ApiResponse>(responseBody)
+        println("YUMMY SEARCH URL: $url")
+        showToast("Search: $query")
 
-        return apiResponse.response?.mapNotNull { anime ->
-            val title = anime.title ?: return@mapNotNull null
-            val animeUrl = anime.animeUrl ?: return@mapNotNull null
-            val poster = anime.poster?.fullsize ?: ""
-            val description = anime.description ?: ""
+        return try {
+            val responseBody = app.get(url, headers).toString()
 
-            newAnimeSearchResponse(
-                title,
-                "https://site.yummyani.me/catalog/item/$animeUrl",
-                TvType.Anime
-            ) {
-                this.posterUrl = poster
+            println("YUMMY RESPONSE: $responseBody")
+
+            val json = org.json.JSONObject(responseBody)
+            val responseArray = json.optJSONArray("response")
+
+            println("YUMMY ARRAY SIZE: ${responseArray?.length()}")
+
+            if (responseArray == null || responseArray.length() == 0) {
+                showToast("❌ Нічого не знайдено")
+                return emptyList()
             }
-        } ?: emptyList()
+
+            val results = mutableListOf<SearchResponse>()
+
+            for (i in 0 until responseArray.length()) {
+                val obj = responseArray.optJSONObject(i) ?: continue
+
+                val title = obj.optString("title", "")
+                val animeUrl = obj.optString("anime_url", "")
+                val poster = obj.optJSONObject("poster")?.optString("fullsize") ?: ""
+
+                println("ITEM: $title | $animeUrl")
+
+                if (title.isBlank() || animeUrl.isBlank()) continue
+
+                results.add(
+                    newAnimeSearchResponse(
+                        title,
+                        "https://site.yummyani.me/catalog/item/$animeUrl",
+                        TvType.Anime
+                    ) {
+                        this.posterUrl = poster
+                    }
+                )
+            }
+
+            showToast("✅ Знайдено: ${results.size}")
+
+            results
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println("YUMMY ERROR: ${e.message}")
+            showToast("❌ Error search")
+            emptyList()
+        }
     }
 
     // =========================
