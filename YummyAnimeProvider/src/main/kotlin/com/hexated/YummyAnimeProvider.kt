@@ -172,7 +172,9 @@ class YummyAnimeProvider : MainAPI() {
             url = url,
             type = TvType.Anime
         ) {
-            this.episodes = episodes
+            this.episodes = mutableMapOf(
+                DubStatus.Subbed to episodes
+            )
         }
     }
 
