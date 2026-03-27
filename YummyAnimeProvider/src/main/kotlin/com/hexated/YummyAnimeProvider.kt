@@ -8,6 +8,9 @@ import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import org.json.Json
 import org.json.jsonArray
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 
 
 class YummyAnimeProvider : MainAPI() {
@@ -48,6 +51,22 @@ class YummyAnimeProvider : MainAPI() {
         )
     }
 
+
+    data class AnimeItem(
+        @JsonProperty("title") val title: String? = null,
+        @JsonProperty("anime_url") val animeUrl: String? = null,
+        @JsonProperty("poster") val poster: Poster? = null,
+        @JsonProperty("description") val description: String? = null
+    )
+
+    data class Poster(
+        @JsonProperty("fullsize") val fullsize: String? = null
+    )
+
+    data class ApiResponse(
+        @JsonProperty("response") val response: List<AnimeItem>? = null
+    )
+
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "https://api.yani.tv/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&offset=0&limit=20"
 
@@ -57,35 +76,25 @@ class YummyAnimeProvider : MainAPI() {
             "Lang" to "ru"
         )
 
-    // Получаем строку ответа
         val responseBody = app.get(url, headers).toString()
+        val mapper = jacksonObjectMapper()
+        val apiResponse = mapper.readValue<ApiResponse>(responseBody)
 
-    // Парсим JSON через org.json
-        val json = org.json.JSONObject(responseBody)
-        val responseArray = json.optJSONArray("response") ?: return emptyList()
+        return apiResponse.response?.mapNotNull { anime ->
+            val title = anime.title ?: return@mapNotNull null
+            val animeUrl = anime.animeUrl ?: return@mapNotNull null
+            val poster = anime.poster?.fullsize ?: ""
+            val description = anime.description ?: ""
 
-        val results = mutableListOf<SearchResponse>()
-
-        for (i in 0 until responseArray.length()) {
-            val obj = responseArray.optJSONObject(i) ?: continue
-            val title = obj.optString("title", null) ?: continue
-            val animeUrl = obj.optString("anime_url", null) ?: continue
-            val poster = obj.optJSONObject("poster")?.optString("fullsize") ?: ""
-            val description = obj.optString("description", "")
-
-            results.add(
-                newAnimeSearchResponse(
-                    title,
-                    "https://site.yummyani.me/catalog/item/$animeUrl",
-                    TvType.Anime
-                ) {
-                    this.posterUrl = poster
-                    this.description = description
-                }
-            )
-        }
-
-        return results
+            newAnimeSearchResponse(
+                title,
+                "https://site.yummyani.me/catalog/item/$animeUrl",
+                TvType.Anime
+            ) {
+                this.posterUrl = poster
+                this.description = description
+            }
+        } ?: emptyList()
     }
 
     // =========================
