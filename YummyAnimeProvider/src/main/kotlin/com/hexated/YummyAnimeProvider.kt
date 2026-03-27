@@ -164,13 +164,18 @@ class YummyAnimeProvider : MainAPI() {
 
         val data = apiResponse.response
 
+        val data = res.response ?: run {
+            println("❌ No response from API")
+            return null
+        }
+
         val episodes = data.episodes?.map { ep ->
             newEpisode(
-               data = ep.id.toString(),
-            ) {
-                name = "Episode ${ep.episode}"
-            }
-        } ?: emptyList()
+                data = ep.id.toString()
+        ) {
+            name = "Episode ${ep.episode}"
+        }
+    } ?: emptyList())
 
         return newAnimeLoadResponse(
             name = slug,
