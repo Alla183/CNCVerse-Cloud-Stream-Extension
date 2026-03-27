@@ -23,17 +23,13 @@ class YummyAnimeProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-
         val url = "$mainUrl/catalog?page=$page"
-
         val doc = app.get(url).document
 
-        val list = doc.select("a.image-block").mapNotNull { element ->
-            val link = element.attr("href")
+        val list = doc.select("div.anime-column").mapNotNull { element ->
+            val link = element.selectFirst("a.image-block")?.attr("href") ?: return@mapNotNull null
             val poster = element.selectFirst("img")?.attr("src") ?: ""
-
-            val parent = element.parent()
-            val title = parent?.selectFirst(".anime-title")?.text() ?: return@mapNotNull null
+            val title = element.selectFirst(".anime-title")?.text() ?: return@mapNotNull null
 
             newAnimeSearchResponse(
                 title,
@@ -50,11 +46,9 @@ class YummyAnimeProvider : MainAPI() {
         )
     }
 
-    // =========================
-    // 🔎 Пошук
-    // =========================
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/search?word=${query.encodeURLParameter()}"
+        val encodedQuery = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8.toString())
+        val url = "$mainUrl/search?word=$encodedQuery"
         val doc = app.get(url).document
 
         return doc.select("div.anime-column").mapNotNull { element ->
