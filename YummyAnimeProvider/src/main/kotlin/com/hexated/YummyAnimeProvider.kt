@@ -7,7 +7,6 @@ import org.json.JSONObject
 import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import org.json.Json
-import org.json.jsonObject
 import org.json.jsonArray
 import org.json.jsonPrimitive
 
