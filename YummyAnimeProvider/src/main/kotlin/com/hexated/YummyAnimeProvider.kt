@@ -6,8 +6,6 @@ import org.jsoup.nodes.Element
 import org.json.JSONObject
 import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import org.json.Json
-import org.json.jsonArray
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
