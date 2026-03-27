@@ -56,12 +56,10 @@ class YummyAnimeProvider : MainAPI() {
 
         return doc.select("a.image-block").mapNotNull { element ->
             val link = element.attr("href")
-            val poster = element.select("img").attr("src")
+            val poster = element.selectFirst("img")?.attr("src") ?: ""
 
             val parent = element.parent()
-            val title = parent.select(".anime-title").text()
-
-            if (title.isNullOrBlank()) return@mapNotNull null
+            val title = parent?.selectFirst(".anime-title")?.text() ?: return@mapNotNull null
 
             newAnimeSearchResponse(
                 title,
