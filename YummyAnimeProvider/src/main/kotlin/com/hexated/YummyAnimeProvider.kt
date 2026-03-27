@@ -90,7 +90,6 @@ class YummyAnimeProvider : MainAPI() {
                 TvType.Anime
             ) {
                 this.posterUrl = poster
-                this.description = description
             }
         } ?: emptyList()
     }
