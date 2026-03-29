@@ -170,6 +170,13 @@ class DoramaLandProvider : MainAPI() {
 
         println("GENRES LIST: $genres")
 
+        val score = doc.select(".about-serial-characteristics li")
+            .firstOrNull { it.text().contains("MyDramaList") }
+            ?.selectFirst(".font-light-18")
+            ?.text()
+            ?.replace(",", ".")
+            ?.toDoubleOrNull()
+
         // 🔗 RELATED
         val related = doc.select(".related-serials .catalog-item").mapNotNull { el ->
             val href = el.selectFirst("a")?.attr("href") ?: return@mapNotNull null
@@ -303,6 +310,7 @@ class DoramaLandProvider : MainAPI() {
             this.plot = description
             this.tags = genres
             this.recommendations = related + recommendations
+            this.score = score
         }
     }
 
