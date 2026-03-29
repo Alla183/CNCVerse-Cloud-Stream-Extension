@@ -176,6 +176,7 @@ class DoramaLandProvider : MainAPI() {
             ?.text()
             ?.replace(",", ".")
             ?.toDoubleOrNull()
+            ?.let { Score.from10(it) }   // 🔥 ВАЖЛИВО
 
         // 🔗 RELATED
         val related = doc.select(".related-serials .catalog-item").mapNotNull { el ->
