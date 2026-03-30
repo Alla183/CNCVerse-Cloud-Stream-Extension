@@ -146,16 +146,42 @@ class YummyAnimeProvider : MainAPI() {
     // Опис
         val plot = doc.selectFirst("p[itemprop=description]")?.text()
 
-    // Серії (на даний момент можна додати iframe як приклад)
+    // 🔥 отримуємо anime_url
+        val animeUrl = url.substringAfterLast("/")
+
+        val apiUrl = "https://api.yani.tv/anime/$animeUrl?need_videos=true"
+
+        val headers = mapOf(
+            "X-Application" to "i0zejgswfnwup27a",
+            "Accept" to "application/json",
+            "Lang" to "ru"
+        )
+
+        val json = JSONObject(app.get(apiUrl, headers).toString())
+        val response = json.optJSONObject("response")
+
+        val videos = response?.optJSONArray("videos")
+
         val episodes = mutableListOf<Episode>()
-        val iframe = doc.selectFirst("iframe")?.attr("src")
-        if (!iframe.isNullOrBlank()) {
-            episodes.add(
-                newEpisode(iframe) {
-                    name = "Episode 1"
-                    episode = 1
-                }
-            )
+        val seen = mutableSetOf<String>()
+
+        if (videos != null) {
+            for (i in 0 until videos.length()) {
+                val obj = videos.optJSONObject(i) ?: continue
+
+                val number = obj.optString("number") ?: continue
+                val episodeId = obj.optString("id") ?: continue
+
+                if (number in seen) continue
+                seen.add(number)
+
+                episodes.add(
+                    newEpisode(episodeId) {
+                        name = "Серія $number"
+                        episode = number.toFloatOrNull()
+                    }
+                )
+            }
         }
 
         return newAnimeLoadResponse(
@@ -165,8 +191,10 @@ class YummyAnimeProvider : MainAPI() {
         ) {
             posterUrl = fixUrl(poster)
             this.plot = plot
+
+        // 🔥 ВАЖЛИВО: саме так CloudStream очікує episodes
             this.episodes = mutableMapOf(
-                DubStatus.Subbed to episodes
+                DubStatus.Subbed to episodes.sortedBy { it.episode }
             )
         }
     }
