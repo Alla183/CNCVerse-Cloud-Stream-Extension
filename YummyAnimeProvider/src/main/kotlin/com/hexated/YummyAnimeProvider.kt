@@ -1,7 +1,7 @@
 package com.hexated
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.model.*
+import com.lagradost.cloudstream3.models.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 import org.json.JSONObject
@@ -15,7 +15,6 @@ import okhttp3.Request
 import okhttp3.Headers
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
-import com.lagradost.cloudstream3.video.Video
 
 class YummyAnimeProvider : MainAPI() {
 
@@ -169,7 +168,7 @@ class YummyAnimeProvider : MainAPI() {
                 episodes.add(
                     newEpisode(fixedIframe) {
                         name = "Серия $number"
-                        episode = number.toFloatOrNull()
+                        episode = number.toIntOrNull()
                     }
                 )
             }
@@ -179,12 +178,38 @@ class YummyAnimeProvider : MainAPI() {
             posterUrl = fixUrl(poster)
             title = title
             plot = plot
-            this.episodes = episodes.sortedBy { it.episode }
+            this.episodes = mapOf(DubStatus.Subbed to episodes.sortedBy { it.episode })
         }
     }
     // -------------------------
     // Епізоди через Kodik API
     // -------------------------
+    fun decodeKodik(src: String): String? {
+        if (src.startsWith("http")) return src
+
+        for (shift in 0..25) {
+            val shifted = src.map {
+                when (it) {
+                    in 'a'..'z' -> 'a' + (it - 'a' + shift) % 26
+                    in 'A'..'Z' -> 'A' + (it - 'A' + shift) % 26
+                    else -> it
+                }
+            }.joinToString("")
+
+            val decoded = runCatching {
+                val padded = shifted + "=".repeat((4 - shifted.length % 4) % 4)
+                String(android.util.Base64.decode(padded, android.util.Base64.DEFAULT))
+            }.getOrNull()
+
+            if (decoded != null && decoded.startsWith("http")) {
+                return decoded
+            }
+        }
+
+        return null
+    }
+
+    
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -235,7 +260,7 @@ class YummyAnimeProvider : MainAPI() {
                     )
                 )
 
-                val json = JSONObject(request)
+                val json = JSONObject(request.text)
 
                 val links = json.optJSONObject("links") ?: continue
 
@@ -251,12 +276,12 @@ class YummyAnimeProvider : MainAPI() {
                         val decoded = decodeKodik(src) ?: continue
 
                         callback.invoke(
-                            ExtractorLink(
-                                "YummyAnime",
-                                "Kodik $quality",
-                                decoded,
-                                iframe,
-                                quality.removeSuffix("p").toIntOrNull() ?: 720,
+                            newExtractorLink(
+                                source = "YummyAnime",
+                                name = "Kodik $quality",
+                                url = decoded,
+                                referer = iframe,
+                                quality = quality.removeSuffix("p").toIntOrNull() ?: 720,
                                 isM3u8 = decoded.contains(".m3u8")
                             )
                         )
