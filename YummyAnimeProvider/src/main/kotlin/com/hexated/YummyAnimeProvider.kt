@@ -134,72 +134,144 @@ class YummyAnimeProvider : MainAPI() {
 
     // Опис
         val plot = doc.selectFirst("p[itemprop=description]")?.text()
+    // 🔥 витягуємо anime_url
+        val animeUrl = url.substringAfterLast("/")
 
+        val apiUrl = "https://api.yani.tv/anime/$animeUrl?need_videos=true"
+
+        val headers = mapOf(
+            "X-Application" to "i0zejgswfnwup27a",
+            "Accept" to "application/json",
+            "Lang" to "ru"
+        )
+
+        val json = JSONObject(app.get(apiUrl, headers).toString())
+        val response = json.optJSONObject("response")
+
+        val videos = response?.optJSONArray("videos")
+
+        val episodes = mutableListOf<Episode>()
+
+        val seen = mutableSetOf<String>()
+
+        if (videos != null) {
+            for (i in 0 until videos.length()) {
+                val obj = videos.optJSONObject(i) ?: continue
+
+                val number = obj.optString("number") ?: continue
+                val iframe = obj.optString("iframe_url") ?: continue
+
+                if (number in seen) continue
+                seen.add(number)
+
+                val fixedIframe = if (iframe.startsWith("//")) "https:$iframe" else iframe
+
+                episodes.add(
+                    newEpisode(fixedIframe) {
+                        name = "Серия $number"
+                        episode = number.toFloatOrNull()
+                    }
+                )
+            }
+        }
+
+        return newAnimeLoadResponse(title, url, TvType.Anime) {
+            posterUrl = fixUrl(poster)
+            title = title
+            plot = plot
+            this.episodes = episodes.sortedBy { it.episode }
+        }
+    }
     // -------------------------
     // Епізоди через Kodik API
     // -------------------------
-        val episodes = mutableListOf<Episode>()
-
-        try {
-            // Витягуємо slug для API
-            val urlParts = url.removePrefix(mainUrl).removePrefix("/anime/").split("/")
-            if (urlParts.isNotEmpty()) {
-                val animeSlug = urlParts[0]
-                val apiUrl = "$mainUrl/api/anime/$animeSlug/episodes"
-                val response = app.get(apiUrl).text()
-
-                // Десеріалізація JSON
-                val episodesResponse = gson.fromJson(response, EpisodesResponse::class.java)
-                episodesResponse.data?.forEach { ep ->
-                    val episode = Episode(
-                        name = ep.title ?: "Episode ${ep.number ?: "?"}",
-                        url = "${animeSlug}/episodes/${ep.id ?: ""}",
-                        episodeNumber = ep.number?.toFloat() ?: 0f
-                    )
-                    episodes.add(episode)
-                }
-            }
-        } catch (e: Exception) {
-            println("Error loading episodes: ${e.message}")
-        }
-
-        return SAnime(
-            title = title,
-            thumbnail_url = poster,
-            description = description,
-            episodes = episodes
-        )
-    }
-
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        try {
-            val urlParts = data.split("/")
-            if (urlParts.size < 3) return false
 
-            val animeSlug = urlParts[0]
-            val episodeId = urlParts[2]
-            val apiUrl = "$mainUrl/api/anime/$animeSlug/episodes/$episodeId/players"
+        if (data.isBlank()) return false
 
-            val response = app.get(apiUrl).text()
-            val playersResponse = gson.fromJson(response, PlayersResponse::class.java)
+        val iframe = if (data.startsWith("//")) "https:$data" else data
 
-            playersResponse.data?.forEach { player ->
-                player.embeds?.forEach { embed ->
-                    val videos = extractKodik(embed.url ?: "")
-                    videos.forEach { video ->
-                        callback.invoke(ExtractorLink(video.url, "Kodik", video.url, null))
+        println("YUMMY iframe: $iframe")
+
+    // 🔥 витягуємо ID + HASH
+        val regex = Regex("/season/(\\d+)/([a-z0-9]+)/")
+        val match = regex.find(iframe)
+
+        if (match == null) {
+            println("❌ Не знайдено ID")
+            return false
+        }
+
+        val id = match.groupValues[1]
+        val hash = match.groupValues[2]
+
+    // 🔥 fallback домени як у Tachiyomi
+        val hosts = listOf(
+            "https://kodik.cc",
+            "https://kodik.info",
+            "https://kodik.biz",
+            "https://kodik.link"
+        )
+
+        for (host in hosts) {
+            try {
+                val request = app.post(
+                    "$host/ftor",
+                    data = mapOf(
+                        "id" to id,
+                        "hash" to hash,
+                        "type" to "anime-serial",
+                        "bad_user" to "true",
+                        "cdn_is_working" to "true"
+                    ),
+                    headers = mapOf(
+                        "X-Requested-With" to "XMLHttpRequest",
+                        "Referer" to iframe
+                    )
+                )
+
+                val json = JSONObject(request)
+
+                val links = json.optJSONObject("links") ?: continue
+
+                links.keys().forEach { quality ->
+
+                    val arr = links.optJSONArray(quality) ?: return@forEach
+
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.optJSONObject(i) ?: continue
+
+                        val src = obj.optString("src")
+
+                        val decoded = decodeKodik(src) ?: continue
+
+                        callback.invoke(
+                            ExtractorLink(
+                                "YummyAnime",
+                                "Kodik $quality",
+                                decoded,
+                                iframe,
+                                quality.removeSuffix("p").toIntOrNull() ?: 720,
+                                isM3u8 = decoded.contains(".m3u8")
+                            )
+                        )
                     }
                 }
+
+                println("✅ SUCCESS через $host")
+                return true
+
+            } catch (e: Exception) {
+                println("❌ fail $host: ${e.message}")
             }
-            return true
-        } catch (e: Exception) {
-            println("Error loading links: ${e.message}")
-            return false
+        }
+
+        return false
         }
     }
 }
