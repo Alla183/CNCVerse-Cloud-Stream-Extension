@@ -178,7 +178,7 @@ class YummyAnimeProvider : MainAPI() {
                 episodes.add(
                     newEpisode(episodeId) {
                         name = "Серія $number"
-                        episode = number.toFloatOrNull()
+                        number.toFloatOrNull()?.toInt()
                     }
                 )
             }
