@@ -9,7 +9,6 @@ import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.lagradost.cloudstream3.CommonActivity.showToast
 
 
 class YummyAnimeProvider : MainAPI() {
