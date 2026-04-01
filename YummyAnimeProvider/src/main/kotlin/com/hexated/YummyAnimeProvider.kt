@@ -214,7 +214,8 @@ class YummyAnimeProvider : MainAPI() {
         println("LOADLINKS DATA: $data")
         showToast("loadLinks start")
 
-        val (animeUrl, episodeNumber) = data.split("|")
+        val (rawUrl, episodeNumber) = data.split("|")
+        val animeUrl = rawUrl.substringAfterLast("/")
 
         val apiUrl = "https://api.yani.tv/anime/$animeUrl?need_videos=true&episode=$episodeNumber"
 
