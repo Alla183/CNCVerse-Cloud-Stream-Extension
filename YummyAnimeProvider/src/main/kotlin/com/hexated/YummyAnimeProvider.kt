@@ -9,6 +9,9 @@ import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import okhttp3.FormBody
+import android.net.Uri
+import android.util.Base64
 
 
 class YummyAnimeProvider : MainAPI() {
@@ -270,14 +273,14 @@ class YummyAnimeProvider : MainAPI() {
                 println("VIDEO: ${it.first}")
 
                 callback.invoke(
-                    ExtractorLink(
-                        "Kodik",
-                        it.second,
-                        it.first,
-                        "",
-                        getQualityFromName(it.second),
-                        isM3u8 = it.first.contains(".m3u8")
-                    )
+                    newExtractorLink(
+                        source = "Kodik",
+                        name = it.second,
+                        url = it.first,
+                        type = if (it.first.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                    ) {
+                        this.quality = getQualityFromName(it.second)
+                    }
                 )
             }
         }
