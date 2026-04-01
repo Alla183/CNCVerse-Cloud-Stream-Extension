@@ -235,7 +235,7 @@ class YummyAnimeProvider : MainAPI() {
 
             if (iframe.contains("kodik", true)) {
                 
-                val extracted = loadExtractor(iframe, url, subtitleCallback, callback)
+                val extracted = loadExtractor(iframe, data, subtitleCallback, callback)
 
                 if (extracted) return true
             }
