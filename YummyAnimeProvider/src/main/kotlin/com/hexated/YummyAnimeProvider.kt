@@ -343,10 +343,41 @@ class YummyAnimeProvider : MainAPI() {
             .add("cdn_is_working", "true")
             .build()
 
-        val linkJsonText = app.post(
-            url = "https://kodik.cc$endpoint",
-            requestBody = body
-        ).text
+        val hosts = listOf(
+            "https://kodik.cc",
+            "https://kodik.info",
+            "https://kodik.biz",
+            "https://kodikapi.com"
+        )
+
+        var linkJsonText: String? = null
+
+        for (host in hosts) {
+            try {
+                val testUrl = "$host$endpoint"
+                println("TRY HOST: $testUrl")
+                showToast("host: $host")
+
+                val res = app.post(
+                    url = testUrl,
+                    requestBody = body
+                ).text
+
+                if (res.trim().startsWith("{")) {
+                    println("✅ SUCCESS HOST: $host")
+                    linkJsonText = res
+                    break
+                }
+
+            } catch (e: Exception) {
+                println("❌ FAIL HOST: $host ${e.message}")
+            }
+        }
+        
+        if (linkJsonText == null) {
+            showToast("❌ all hosts failed")
+            return emptyList()
+        }
 
         println("KODIK RESPONSE: ${linkJsonText.take(300)}")
 
