@@ -176,9 +176,9 @@ class YummyAnimeProvider : MainAPI() {
                 seen.add(number)
 
                 episodes.add(
-                    newEpisode(episodeId) {
-                        name = "Серія $number"
-                        number.toFloatOrNull()?.toInt()
+                    newEpisode("$animeUrl|$number") {
+                    name = "Серія $number"
+                    episode = number.toFloatOrNull()
                     }
                 )
             }
@@ -209,37 +209,39 @@ class YummyAnimeProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
 
-        val episodeId = data
+        val episodeNumber = data // ⚠️ тепер це number, не id
 
-        val url = "https://api.yani.tv/episode/$episodeId"
+        val animeUrl = data.substringBefore("|")
+        val epNum = data.substringAfter("|")
+
+        val apiUrl = "https://api.yani.tv/anime/$animeUrl?need_videos=true"
 
         val headers = mapOf(
             "X-Application" to "i0zejgswfnwup27a",
-            "Accept" to "application/json"
+            "Accept" to "application/json",
+            "Lang" to "ru"
         )
 
-        val response = app.get(url, headers).toString()
+        val json = JSONObject(app.get(apiUrl, headers).text)
+        val response = json.optJSONObject("response")
+        val videos = response?.optJSONArray("videos") ?: return false
 
-        val json = JSONObject(response)
+        for (i in 0 until videos.length()) {
+            val obj = videos.optJSONObject(i) ?: continue
 
-        val streams = json.optJSONArray("streams") ?: return false
+            val number = obj.optString("number") ?: continue
+            if (number != epNum) continue
 
-        for (i in 0 until streams.length()) {
-            val stream = streams.optJSONObject(i) ?: continue
+            val iframe = obj.optString("iframe_url") ?: continue
 
-            val videoUrl = stream.optString("url") ?: continue
-            val quality = stream.optString("quality") ?: "HD"
+            if (iframe.contains("kodik", true)) {
+                
+                val extracted = loadExtractor(iframe, url, subtitleCallback, callback)
 
-            callback.invoke(
-                newExtractorLink(
-                    source = "YummyAnime",
-                    name = "YummyAnime $quality",
-                    url = videoUrl,
-                    type = INFER_TYPE
-                )
-            )
+                if (extracted) return true
+            }
         }
 
-        return true
+        return false
     }
 }
