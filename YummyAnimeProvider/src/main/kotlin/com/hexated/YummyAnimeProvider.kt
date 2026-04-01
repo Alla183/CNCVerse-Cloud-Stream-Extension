@@ -170,7 +170,6 @@ class YummyAnimeProvider : MainAPI() {
                 val obj = videos.optJSONObject(i) ?: continue
 
                 val number = obj.optString("number") ?: continue
-                val episodeId = obj.optString("id") ?: continue
 
                 if (number in seen) continue
                 seen.add(number)
@@ -178,7 +177,7 @@ class YummyAnimeProvider : MainAPI() {
                 episodes.add(
                     newEpisode("$animeUrl|$number") {
                     name = "Серія $number"
-                    episode = number.toFloatOrNull()
+                    episode = number.toFloatOrNull()?.toInt()
                     }
                 )
             }
