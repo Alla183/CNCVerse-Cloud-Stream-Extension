@@ -320,7 +320,7 @@ class DoramaLandProvider : MainAPI() {
             this.tags = genres
             this.recommendations = related + recommendations
             this.score = score
-            this.altTitles = altTitles
+            this.actors = altTitles?.map { Actor(it) }
         }
     }
 
