@@ -307,6 +307,8 @@ class DoramaLandProvider : MainAPI() {
                 this.plot = description
                 this.tags = genres
                 this.recommendations = related + recommendations
+                this.tags = genres
+                this.score = score
             }
         }
 
