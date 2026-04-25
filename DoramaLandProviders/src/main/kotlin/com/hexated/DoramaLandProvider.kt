@@ -178,12 +178,6 @@ class DoramaLandProvider : MainAPI() {
             ?.toDoubleOrNull()
             ?.let { Score.from10(it) }   // 🔥 ВАЖЛИВО
 
-        val altTitles = doc.selectFirst(".about-serial-header_subtitle")
-            ?.text()
-            ?.split("/")              // 🔥 розділяємо
-            ?.map { it.trim() }       // прибираємо пробіли
-            ?.filter { it.isNotEmpty() }
-
         // 🔗 RELATED
         val related = doc.select(".related-serials .catalog-item").mapNotNull { el ->
             val href = el.selectFirst("a")?.attr("href") ?: return@mapNotNull null
@@ -320,7 +314,6 @@ class DoramaLandProvider : MainAPI() {
             this.tags = genres
             this.recommendations = related + recommendations
             this.score = score
-            this.actors = altTitles?.map { Actor(it) }
         }
     }
 
