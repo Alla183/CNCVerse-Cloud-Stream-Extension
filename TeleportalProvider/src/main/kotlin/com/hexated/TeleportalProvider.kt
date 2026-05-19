@@ -23,12 +23,12 @@ import com.lagradost.cloudstream3.newHomePageResponse
 import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.models.Media
-import com.lagradost.models.MediaShows
-import com.lagradost.models.Search
-import com.lagradost.models.SeasonModel
-import com.lagradost.models.TitleShows
-import com.lagradost.models.VideoPlayer
+import com.hexated.models.Media
+import com.hexated.models.MediaShows
+import com.hexated.models.Search
+import com.hexated.models.SeasonModel
+import com.hexated.models.TitleShows
+import com.hexated.models.VideoPlayer
 
 class TeleportalProvider : MainAPI() {
 
