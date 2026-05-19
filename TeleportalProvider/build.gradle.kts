@@ -1,13 +1,6 @@
 // use an integer for version numbers
 version = 7
 
-dependencies {
-    implementation(libs.gson)
-
-    testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-}
-
 cloudstream {
     language = "uk"
     // All of these properties are optional, you can safely remove them
