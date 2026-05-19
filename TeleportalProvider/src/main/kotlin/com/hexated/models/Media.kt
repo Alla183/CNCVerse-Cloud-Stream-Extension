@@ -1,4 +1,4 @@
-package com.hexated
+package com.hexated.models
 
 data class Media(
 
