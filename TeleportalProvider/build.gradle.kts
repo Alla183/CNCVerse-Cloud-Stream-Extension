@@ -23,3 +23,9 @@ cloudstream {
 
     iconUrl = "https://www.google.com/s2/favicons?domain=teleportal.ua&sz=%size%"
 }
+
+android {
+    buildFeatures {
+        buildConfig = true
+    }
+}
