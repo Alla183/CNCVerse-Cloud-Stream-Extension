@@ -16,20 +16,30 @@ import org.jsoup.nodes.Element
 import java.util.*
 
 
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.webkit.CookieManager
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+
+import okhttp3.Interceptor
+
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+
 class HDrezkaProvider : MainAPI() {
 
     companion object {
         private const val BROWSER_DEBOUNCE_MS = 10_000L
 
-        private var context: Context? = null
+        var context: content.Context? = null
 
         private var csGuardWasEverActive = false
         private var lastBrowserOpenMs = 0L
-        private var telegramPopupShown = false
-        private var subscriptionPopupShown = false
-
-        // TODO: прибрати рекламу
-        // private const val OMG10 = "https://omg10.com/4/11104489"
     }
 
     private var anubisCookie: String? = null
