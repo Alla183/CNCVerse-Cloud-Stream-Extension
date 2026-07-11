@@ -15,16 +15,35 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.*
 
+
 class HDrezkaProvider : MainAPI() {
+
     companion object {
-        var context: android.content.Context? = null
+        private const val BROWSER_DEBOUNCE_MS = 10_000L
+
+        private var context: Context? = null
+
+        private var csGuardWasEverActive = false
+        private var lastBrowserOpenMs = 0L
+        private var telegramPopupShown = false
+        private var subscriptionPopupShown = false
+
+        // TODO: прибрати рекламу
+        // private const val OMG10 = "https://omg10.com/4/11104489"
     }
 
+    private var anubisCookie: String? = null
+
     override var mainUrl = "https://rezka.ag"
+
     override var name = "HDrezka"
+
     override val hasMainPage = true
+
     override var lang = "ru"
+
     override val hasDownloadSupport = true
+
     override val supportedTypes = setOf(
         TvType.Movie,
         TvType.TvSeries,
@@ -36,62 +55,267 @@ class HDrezkaProvider : MainAPI() {
         "$mainUrl/films/?filter=watching" to "фильмы",
         "$mainUrl/series/?filter=watching" to "сериалы",
         "$mainUrl/cartoons/?filter=watching" to "мультфильмы",
-        "$mainUrl/animation/?filter=watching" to "аниме",
+        "$mainUrl/animation/?filter=watching" to "аниме"
     )
+
+
+    private val anubisKiller = Interceptor { chain ->
+        val request = chain.request()
+        val url = request.url.toString()
+
+        if (anubisCookie.isNullOrEmpty()) {
+            anubisCookie = getAnubisCookie(url)
+        }
+
+        val reqWithCookie =
+            if (!anubisCookie.isNullOrEmpty()) {
+                request.newBuilder()
+                    .header("Cookie", anubisCookie!!)
+                    .header(
+                        "User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+                    )
+                    .build()
+            } else {
+                request.newBuilder()
+                    .header(
+                        "User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+                    )
+                    .build()
+            }
+
+        var response = chain.proceed(reqWithCookie)
+
+        val body = response.peekBody(Long.MAX_VALUE).string()
+
+        if (body.contains("id=\"anubis_challenge\"") || response.code == 503) {
+            response.close()
+
+            val newCookie = getAnubisCookie(url)
+
+            if (newCookie != null) {
+                anubisCookie = newCookie
+
+                val retry = request.newBuilder()
+                    .header("Cookie", anubisCookie!!)
+                    .header(
+                        "User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+                    )
+                    .build()
+
+                return@Interceptor chain.proceed(retry)
+            }
+
+            return@Interceptor chain.proceed(request)
+        }
+
+        response
+    }
+
+
+
+    private fun getAnubisCookie(url: String): String? {
+        val latch = CountDownLatch(1)
+        var fetchedCookie: String? = null
+
+        Handler(Looper.getMainLooper()).post {
+            try {
+                val ctx = context ?: throw Exception("Context is null")
+
+                val webView = WebView(ctx)
+
+                webView.settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = true
+                    loadsImagesAutomatically = false
+                    blockNetworkImage = true
+                    mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                    userAgentString =
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+                }
+
+                webView.webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest
+                    ): Boolean {
+                        val targetHost = Uri.parse(url).host ?: return false
+                        val reqHost = request.url.host ?: return false
+                        return !reqHost.contains(targetHost)
+                    }
+                }
+
+                webView.loadUrl(url)
+
+                var polling = true
+
+                val handler = Handler(Looper.getMainLooper())
+
+                val checkRunnable = object : Runnable {
+                    override fun run() {
+                        if (!polling) return
+
+                        val cookies = CookieManager.getInstance().getCookie(url)
+
+                        if (cookies == null || !cookies.contains("-anubis-auth=")) {
+                            handler.postDelayed(this, 250)
+                            return
+                        }
+
+                        polling = false
+
+                        fetchedCookie = cookies
+                            .split(";")
+                            .map { it.trim() }
+                            .firstOrNull { it.contains("-anubis-auth=") }
+
+                        try {
+                            webView.stopLoading()
+                            webView.destroy()
+                        } catch (_: Exception) {
+                        }
+
+                        if (latch.count > 0)
+                            latch.countDown()
+                    }
+                }
+
+                handler.postDelayed(checkRunnable, 250)
+
+                handler.postDelayed({
+                    polling = false
+
+                    try {
+                        webView.stopLoading()
+                        webView.destroy()
+                    } catch (_: Exception) {
+                    }
+
+                    if (latch.count > 0)
+                        latch.countDown()
+                }, 15000)
+
+            } catch (_: Exception) {
+                if (latch.count > 0)
+                    latch.countDown()
+            }
+        }
+
+        latch.await(16, TimeUnit.SECONDS)
+
+        return fetchedCookie
+    }
+    
 
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        HDrezkaProvider.context?.let { StarPopupHelper.showStarPopupIfNeeded(it) }
-        
-        val url = request.data.split("?")
-        val home = app.get("${url.first()}page/$page/?${url.last()}").document.select(
-            "div.b-content__inline_items div.b-content__inline_item"
-        ).map {
-            it.toSearchResult()
+
+        if (Companion.isCsGuardBlocked()) {
+            Companion.showCsGuardToast(context)
+            return newHomePageResponse(emptyList())
         }
 
-        return newHomePageResponse(request.name, home)
+        val url = request.data.split("?")
+
+        val document = app.get(
+            "${url.first()}page/$page/?${url.last()}",
+            interceptor = anubisKiller
+        ).document
+
+        val home = document
+            .select("div.b-content__inline_items div.b-content__inline_item")
+            .map(::toSearchResult)
+
+        return newHomePageResponse(
+            request.name,
+            home
+        )
     }
 
     private fun Element.toSearchResult(): SearchResponse {
-        val title =
-            this.selectFirst("div.b-content__inline_item-link > a")?.text()?.trim().toString()
-        val href = this.selectFirst("a")?.attr("href").toString()
-        val posterUrl = this.select("img").attr("src")
-        val type = if (this.select("span.info").isNotEmpty()) TvType.TvSeries else TvType.Movie
-        return if (type == TvType.Movie) {
-            newMovieSearchResponse(title, href, TvType.Movie) {
-                this.posterUrl = posterUrl
+
+        val title = selectFirst(
+            "div.b-content__inline_item-link > a"
+        )?.text()?.trim().orEmpty()
+
+        val href = selectFirst("a")
+            ?.attr("href")
+            .orEmpty()
+
+        val poster = select("img")
+            .attr("src")
+
+        val isSeries = select("span.info").isNotEmpty()
+
+        return if (!isSeries) {
+
+            newMovieSearchResponse(
+                title,
+                href,
+                TvType.Movie
+            ) {
+                posterUrl = poster
             }
+
         } else {
-            val episode =
-                this.select("span.info").text().substringAfter(",").replace(Regex("[^0-9]"), "")
-                    .toIntOrNull()
-            newAnimeSearchResponse(title, href, TvType.TvSeries) {
-                this.posterUrl = posterUrl
+
+            val episode = Regex("[^0-9]")
+                .replace(
+                    select("span.info")
+                        .text()
+                        .substringAfter(","),
+                    ""
+            )
+                .toIntOrNull()
+
+            newAnimeSearchResponse(
+                title,
+                href,
+                TvType.TvSeries
+            ) {
+                posterUrl = poster
                 addDubStatus(
-                    dubExist = true,
-                    dubEpisodes = episode,
-                    subExist = true,
-                    subEpisodes = episode
+                    true,
+                    true,
+                    episode,
+                    episode
                 )
             }
         }
     }
 
-    override suspend fun search(query: String): List<SearchResponse> {
-        val link = "$mainUrl/search/?do=search&subaction=search&q=$query"
-        val document = app.get(link).document
+    override suspend fun search(
+        query: String
+    ): List<SearchResponse> {
 
-        return document.select("div.b-content__inline_items div.b-content__inline_item").map {
-            it.toSearchResult()
-        }
+        val document = app.get(
+
+            "$mainUrl/search/?do=search&subaction=search&q=$query",
+
+            interceptor = anubisKiller
+
+        ).document
+
+        return document
+
+            .select("div.b-content__inline_items div.b-content__inline_item")
+
+            .map {
+
+                it.toSearchResult()
+
+            }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url).document
+        val document = app.get(
+            url,
+            interceptor = anubisKiller
+        ).document
 
         val id = url.split("/").last().split("-").first()
         val title = (document.selectFirst("div.b-post__title h1")?.text()?.trim()
@@ -108,8 +332,9 @@ class HDrezkaProvider : MainAPI() {
         val trailer = app.post(
             "$mainUrl/engine/ajax/gettrailervideo.php",
             data = mapOf("id" to id),
-            referer = url
-        ).parsedSafe<Trailer>()?.code.let {
+            referer = url,
+            interceptor = anubisKiller
+        ).parsedSafe<Trailer>()?.code.let { {
             Jsoup.parse(it.toString()).select("iframe").attr("src")
         }
         val ratingText =
@@ -355,7 +580,10 @@ class HDrezkaProvider : MainAPI() {
 
         tryParseJson<Data>(data)?.let { res ->
             if (res.server?.isEmpty() == true) {
-                val document = app.get(res.ref ?: return@let).document
+                val document = app.get(
+                    res.ref ?: return@let,
+                    interceptor = anubisKiller
+                ).document
                 document.select("script").map { script ->
                     if (script.data().contains("sof.tv.initCDNMoviesEvents(")) {
                         val dataJson =
@@ -385,8 +613,10 @@ class HDrezkaProvider : MainAPI() {
                             "season" to res.season,
                             "episode" to res.episode,
                             "action" to res.action,
-                        ).filterValues { it != null }.mapValues { it.value as String },
-                        referer = res.ref
+                        ).filterValues { it != null }
+                            .mapValues { it.value as String },
+                        referer = res.ref,
+                        interceptor = anubisKiller
                     ).parsedSafe<Sources>()?.let { source ->
                         invokeSources(
                             server.translator_name.toString(),
