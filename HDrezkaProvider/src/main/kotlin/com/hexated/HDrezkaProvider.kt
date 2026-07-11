@@ -15,7 +15,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.*
 
-
+import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -233,7 +233,7 @@ class HDrezkaProvider : MainAPI() {
 
         val home = document
             .select("div.b-content__inline_items div.b-content__inline_item")
-            .map(::toSearchResult)
+            .map { it.toSearchResult() }
 
         return newHomePageResponse(
             request.name,
