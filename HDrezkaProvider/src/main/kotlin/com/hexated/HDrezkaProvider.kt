@@ -224,11 +224,6 @@ class HDrezkaProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
 
-        if (Companion.isCsGuardBlocked()) {
-            Companion.showCsGuardToast(context)
-            return newHomePageResponse(emptyList())
-        }
-
         val url = request.data.split("?")
 
         val document = app.get(
