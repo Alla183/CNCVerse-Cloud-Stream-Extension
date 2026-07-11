@@ -36,7 +36,7 @@ class HDrezkaProvider : MainAPI() {
     companion object {
         private const val BROWSER_DEBOUNCE_MS = 10_000L
 
-        var context: content.Context? = null
+        var context: android.content.Context? = null
 
         private var csGuardWasEverActive = false
         private var lastBrowserOpenMs = 0L
