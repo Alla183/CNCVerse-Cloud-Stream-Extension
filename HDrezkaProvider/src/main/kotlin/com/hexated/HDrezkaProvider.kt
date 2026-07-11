@@ -344,7 +344,7 @@ class HDrezkaProvider : MainAPI() {
             data = mapOf("id" to id),
             referer = url,
             interceptor = anubisKiller
-        ).parsedSafe<Trailer>()?.code.let { {
+        ).parsedSafe<Trailer>()?.code.let {
             Jsoup.parse(it.toString()).select("iframe").attr("src")
         }
         val ratingText =
