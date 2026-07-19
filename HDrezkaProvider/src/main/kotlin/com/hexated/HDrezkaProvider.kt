@@ -353,9 +353,35 @@ class HDrezkaProvider : MainAPI() {
                 )
             }
 
-        val recommendations = document.select("div.b-sidelist div.b-content__inline_item").map {
-            it.toSearchResult()
-        }
+        val recommendations = buildList {
+            // Старые рекомендации
+            addAll(
+                document.select("div.b-sidelist div.b-content__inline_item")
+                    .mapNotNull { it.toSearchResult() }
+            )
+
+    // Новые рекомендации
+            addAll(
+                document.select("div.b-post__partcontent_item[data-url]")
+                    .mapNotNull { item ->
+                        val href = item.attr("data-url")
+                            .ifBlank { item.selectFirst("a")?.attr("href") ?: "" }
+
+                        val title = item.selectFirst(".title")?.text()?.trim()
+                            ?: item.selectFirst("a")?.text()?.trim()
+                            ?: return@mapNotNull null
+
+                        val year = item.selectFirst(".year")
+                            ?.text()
+                            ?.filter(Char::isDigit)
+                            ?.toIntOrNull()
+
+                        newMovieSearchResponse(title, fixUrl(href), TvType.Movie) {
+                            this.year = year
+                        }
+                    }
+            )
+        }.distinctBy { it.url }
 
         val data = HashMap<String, Any>()
         val server = ArrayList<Map<String, String>>()
