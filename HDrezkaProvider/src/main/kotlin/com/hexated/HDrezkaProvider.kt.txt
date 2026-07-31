@@ -376,7 +376,13 @@ class HDrezkaProvider : MainAPI() {
                             ?.filter(Char::isDigit)
                             ?.toIntOrNull()
 
-                        newMovieSearchResponse(title, fixUrl(href), TvType.Movie) {
+                        val num = item.selectFirst(".td.num")?.text()?.trim().orEmpty()
+
+                        newMovieSearchResponse(
+                            "$num. $title",
+                            fixUrl(href),
+                            TvType.Movie
+                        ) {
                             this.year = year
                         }
                     }
