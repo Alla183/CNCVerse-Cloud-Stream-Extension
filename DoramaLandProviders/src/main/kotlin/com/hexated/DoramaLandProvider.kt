@@ -331,8 +331,9 @@ class DoramaLandProvider : MainAPI() {
         val document = app.get(data).document
 
     // =========================================
-    // 🎬 1. ПРОБУЄМО ЯК СЕРІАЛ (старий код)
+    // 🎬 1. ПРОБУЄМО ЯК СЕРІАЛ
     // =========================================
+
         val players = document.select("[data-url-player]")
 
         if (players.isNotEmpty()) {
@@ -340,16 +341,29 @@ class DoramaLandProvider : MainAPI() {
 
             players.forEach { player ->
 
-                val voiceName = player.attr("data-label").ifEmpty { "Unknown" }
+            // Назва озвучки знаходиться всередині <h3>
+            // Наприклад: <h3>Озвучка SoftBox</h3>
+                val voiceName = player
+                    .selectFirst("h3")
+                    ?.text()
+                    ?.removePrefix("Озвучка ")
+                    ?.trim()
+                    ?.ifEmpty { "Unknown" }
+                    ?: "Unknown"
+
                 var iframeUrl = player.attr("data-url-player")
 
-                if (iframeUrl.isNullOrEmpty()) return@forEach
+                if (iframeUrl.isEmpty()) return@forEach
 
                 if (iframeUrl.startsWith("//")) {
                     iframeUrl = "https:$iframeUrl"
                 }
 
+                println("🎙️ VOICE: $voiceName")
+                println("🔗 PLAYER: $iframeUrl")
+
                 try {
+
                     val iframeHtml = app.get(
                         iframeUrl,
                         headers = mapOf(
@@ -363,7 +377,10 @@ class DoramaLandProvider : MainAPI() {
                         ?.value
                         ?.replace("\\/", "/")
 
-                    if (m3u8.isNullOrEmpty()) return@forEach
+                    if (m3u8.isNullOrEmpty()) {
+                        println("❌ M3U8 NOT FOUND: $voiceName")
+                        return@forEach
+                    }
 
                     println("✅ SERIES: $voiceName → $m3u8")
 
