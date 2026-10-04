@@ -1,0 +1,28 @@
+// bump when mirror probe / link naming changes (self-updates via extensions CDN)
+version = 12
+
+
+cloudstream {
+    language = "ru"
+    // All of these properties are optional, you can safely remove them
+
+    // description = "Lorem Ipsum"
+     authors = listOf("Hexated", "lxnhere")
+
+    /**
+     * Status int as the following:
+     * 0: Down
+     * 1: Ok
+     * 2: Slow
+     * 3: Beta only
+     * */
+    status = 1 // will be 3 if unspecified
+    tvTypes = listOf(
+        "AsianDrama",
+        "Anime",
+        "TvSeries",
+        "Movie",
+    )
+
+    iconUrl = "https://www.google.com/s2/favicons?domain=hdrezka.ag&sz=%size%"
+}
