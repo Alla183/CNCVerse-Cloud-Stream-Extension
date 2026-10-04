@@ -35,12 +35,20 @@ jobs:
       - name: Setup JDK 17
         uses: actions/setup-java@v4.6.0
         with:
-          distribution: "adopt"
+          distribution: "temurin"
           java-version: 17
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3.2.2
+      - name: Configure Android SDK
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
 
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+          echo "Android SDK: $SDK"
+          test -d "$SDK"
+
+     
       - name: Access Secrets
         env:
           CONSUMET_API: ${{ secrets.CONSUMET_API }}
