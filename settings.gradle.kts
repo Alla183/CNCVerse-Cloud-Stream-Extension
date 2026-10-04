@@ -4,10 +4,6 @@ rootProject.name = "CNCVerse"
 
 val disabled = listOf<String>()
 
-val disabled = listOf(
-    "DesiSerialsProvider"
-)
-
 File(rootDir, ".").eachDir { dir ->
     if (!disabled.contains(dir.name) && File(dir, "build.gradle.kts").exists()) {
         include(dir.name)
