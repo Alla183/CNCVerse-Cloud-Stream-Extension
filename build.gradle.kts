@@ -9,7 +9,7 @@ buildscript {
     repositories {
         google()
         mavenCentral()
-        uri("https://jitpack.io")
+        maven { url = uri("https://jitpack.io") }
     }
 
     dependencies {
@@ -23,7 +23,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        uri("https://jitpack.io")
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
