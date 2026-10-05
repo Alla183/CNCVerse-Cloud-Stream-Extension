@@ -52,7 +52,6 @@ jobs:
           chmod +x gradlew
           ./gradlew makePluginsJson --continue
           cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
-          cp **/build/*.jar $GITHUB_WORKSPACE/builds
           find . -name "plugins.json" -exec cp {} $GITHUB_WORKSPACE/builds/ \;
           
       - name: Push builds
