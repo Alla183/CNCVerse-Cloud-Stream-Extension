@@ -48,17 +48,97 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
+  
       - name: Build Plugins
         run: |
-          cd $GITHUB_WORKSPACE/src
+          cd "$GITHUB_WORKSPACE/src"
+
           touch local.properties
           chmod +x gradlew
+
           ./gradlew makePluginsJson --continue
-          cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
-          find . -name "plugins.json" -exec cp {} $GITHUB_WORKSPACE/builds/ \;
-          
+
+          echo "========================================"
+          echo "BUILT CS3 FILES"
+          echo "========================================"
+
+          find "$GITHUB_WORKSPACE/src" \
+            -type f \
+            -name "*.cs3" \
+            -print | sort
+
+          echo "========================================"
+          echo "COPYING CS3 FILES TO BUILDS"
+          echo "========================================"
+
+          find "$GITHUB_WORKSPACE/src" \
+            -type f \
+            -name "*.cs3" \
+            -exec cp {} "$GITHUB_WORKSPACE/builds/" \;
+
+          echo "========================================"
+          echo "COPYING plugins.json"
+          echo "========================================"
+
+          cp "$GITHUB_WORKSPACE/src/build/plugins.json" \
+             "$GITHUB_WORKSPACE/builds/plugins.json"
+
+
+      - name: Verify build output
+        run: |
+          echo "========================================"
+          echo "FILES IN BUILDS"
+          echo "========================================"
+
+          find "$GITHUB_WORKSPACE/builds" \
+            -maxdepth 1 \
+            -type f \
+            -print | sort
+
+          echo "========================================"
+          echo "CHECK HDrezkaProvider"
+          echo "========================================"
+
+          test -f "$GITHUB_WORKSPACE/builds/HDrezkaProvider.cs3"
+
+          echo "HDrezkaProvider.cs3 FOUND!"
+
+          echo "========================================"
+          echo "CHECK plugins.json"
+          echo "========================================"
+
+          test -f "$GITHUB_WORKSPACE/builds/plugins.json"
+
+          grep -q "HDrezkaProvider" \
+            "$GITHUB_WORKSPACE/builds/plugins.json"
+
+          echo "HDrezkaProvider FOUND IN plugins.json!"
+
+
       - name: Push builds
         run: |
-          cd $GITHUB_WORKSPACE/builds
+          cd "$GITHUB_WORKSPACE/builds"
+
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
+
+          git add .
+
+          echo "========================================"
+          echo "GIT STATUS"
+          echo "========================================"
+
+          git status --short
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Build $GITHUB_SHA"
+
+          git push origin builds
+
+          echo "========================================"
+          echo "BUILD BRANCH PUSHED"
+          echo "========================================"
