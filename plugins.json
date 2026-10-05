@@ -126,10 +126,10 @@
     },
     {
         "iconUrl": "https://www.google.com/s2/favicons?domain=rezka.ag&sz=%size%",
-        "fileHash": "sha256-ac25280492ac71769e03c762ef78afe82a8d4e6b4151ba0b62faba2330a13a4a",
+        "fileHash": "sha256-40f03ca060dd21dc39f0bb75a9f8f626cca6228d95834fc8c636665e5f83ebdc",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 47426,
+        "fileSize": 47513,
         "status": 1,
         "language": "ru",
         "authors": [
