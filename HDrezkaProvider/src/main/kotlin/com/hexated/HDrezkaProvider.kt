@@ -383,8 +383,8 @@ class HDrezkaProvider : MainAPI() {
         val (document, resolved) = fetchFilmDocument(url)
 
         val id = resolved.split("/").last().split("-").first()
-        val title = (document.selectFirst("div.b-post__title h1")?.text()?.trim()).toString()
-            ?: document.selectFirst("div.b-post__origtitle")?.text()?.trim()
+        val title = (document.selectFirst("div.b-post__title h1")?.text()?.trim()
+            ?: document.selectFirst("div.b-post__origtitle")?.text()?.trim()).toString()
             
         val poster = fixUrlNull(document.selectFirst("div.b-sidecover img")?.attr("src"))
         val tags =
