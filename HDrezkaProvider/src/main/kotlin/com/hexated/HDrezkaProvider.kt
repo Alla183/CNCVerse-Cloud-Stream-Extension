@@ -88,33 +88,37 @@ class HDrezkaProvider : MainAPI() {
                 "$randomData$nonce".toByteArray(Charsets.UTF_8)
             )
 
+            var bits = difficulty
             var valid = true
-            var remaining = difficulty
 
             for (byte in hash) {
-                if (remaining <= 0) break
+                if (bits <= 0) break
 
                 val value = byte.toInt() and 0xff
 
-                if (remaining >= 8) {
+                if (bits >= 8) {
                     if (value != 0) {
                         valid = false
                         break
                     }
-                    remaining -= 8
+                    bits -= 8
                 } else {
-                    val mask = 0xff shl (8 - remaining)
+                    val mask = 0xff shl (8 - bits)
+
                     if ((value and mask) != 0) {
                         valid = false
                     }
-                    remaining = 0
+
+                    bits = 0
                 }
             }
 
             if (valid) {
-                return nonce to hash.joinToString("") {
-                    "%02x".format(it)
+                val hex = hash.joinToString("") {
+                    "%02x".format(it.toInt() and 0xff)
                 }
+
+                return nonce to hex
             }
         }
 
@@ -140,6 +144,11 @@ class HDrezkaProvider : MainAPI() {
             ?: 4
 
         val started = System.currentTimeMillis()
+
+        Log.i( 
+            "HDrezka",
+            "anubis challenge id=$id diff=$diff randomLen=${randomData.length}"
+        )
 
         val solved = solveAnubisPow(randomData, diff) ?: return
         val (nonce, response) = solved
