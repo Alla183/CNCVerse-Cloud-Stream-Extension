@@ -20,9 +20,26 @@ import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.*
 
-
-
+/**
+ * HDrezka — tokenless scrape of public mirrors (n0madic/go-hdrezka defaults + extras).
+ * Picks the first reachable mirror at runtime and refreshes paths against it.
+ * Clears Techaro Anubis PoW (pass via homepage — film redir returns 500).
+ *
+ * Uses [Session] (CookieJar) — global [app] is a bare Requests with NO cookie jar,
+ * so Anubis auth cookies would otherwise be discarded after pass-challenge.
+ */
 class HDrezkaProvider : MainAPI() {
+    override var mainUrl = "https://hdrezka.ag"
+    override var name = "HDrezka"
+    override val hasMainPage = true
+    override var lang = "ru"
+    override val hasDownloadSupport = true
+    override val supportedTypes = setOf(
+        TvType.Movie,
+        TvType.TvSeries,
+        TvType.Anime,
+        TvType.AsianDrama
+    )
 
     private val http by lazy {
         Session(app.baseClient).apply {
@@ -32,342 +49,342 @@ class HDrezkaProvider : MainAPI() {
     }
 
     companion object {
-        private const val BROWSER_DEBOUNCE_MS = 10_000L
-
-        var context: android.content.Context? = null
-
-        private var csGuardWasEverActive = false
-        private var lastBrowserOpenMs = 0L
-    }
-
-    
-
-    override var mainUrl = "https://hdrezka.ag"
-
-    override var name = "HDrezka"
-
-    override val hasMainPage = true
-
-    override var lang = "ru"
-
-    override val hasDownloadSupport = true
-
-    override val supportedTypes = setOf(
-        TvType.Movie,
-        TvType.TvSeries,
-        TvType.Anime,
-        TvType.AsianDrama
-    )
-
-    override val mainPage = mainPageOf(
-        "/films/?filter=last" to "фильмы — новинки",
-        "/films/?filter=watching" to "фильмы — смотрят",
-        "/films/?filter=popular" to "фильмы — популярные",
-
-        "/series/?filter=last" to "сериалы — новинки",
-        "/series/?filter=watching" to "сериалы — смотрят",
-        "/series/?filter=popular" to "сериалы — популярные",
-
-        "/cartoons/?filter=last" to "мультфильмы — новинки",
-        "/cartoons/?filter=watching" to "мультфильмы — смотрят",
-
-        "/animation/?filter=last" to "аниме — новинки",
-        "/animation/?filter=watching" to "аниме — смотрят"
-    )
-
-
-
-    private fun solveAnubisPow(
-        randomData: String,
-        difficulty: Int
-    ): Pair<Long, String>? {
-        val digest = MessageDigest.getInstance("SHA-256")
-
-        for (nonce in 0L until 50_000_000L) {
-            val hash = digest.digest(
-                "$randomData$nonce".toByteArray(Charsets.UTF_8)
-            )
-
-            var bits = difficulty
-            var valid = true
-
-            for (byte in hash) {
-                if (bits <= 0) break
-
-                val value = byte.toInt() and 0xff
-
-                if (bits >= 8) {
-                    if (value != 0) {
-                        valid = false
-                        break
-                    }
-                    bits -= 8
-                } else {
-                    val mask = 0xff shl (8 - bits)
-
-                    if ((value and mask) != 0) {
-                        valid = false
-                    }
-
-                    bits = 0
-                }
-            }
-
-            if (valid) {
-                val hex = hash.joinToString("") {
-                    "%02x".format(it.toInt() and 0xff)
-                }
-
-                return nonce to hex
-            }
-        }
-
-        return null
-    }
-
-
-    private suspend fun passAnubisChallenge(html: String, redir: String) {
-        val raw = ANUBIS_SCRIPT.find(html)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.trim()
-            ?: return
-
-        val payload = tryParseJson<AnubisPayload>(raw) ?: return
-        val ch = payload.challenge ?: return
-
-        val randomData = ch.randomData ?: return
-        val id = ch.id ?: return
-
-        val diff = payload.rules?.difficulty
-            ?: ch.difficulty
-            ?: 4
-
-        val started = System.currentTimeMillis()
-
-        Log.i( 
-            "HDrezka",
-            "anubis challenge id=$id diff=$diff randomLen=${randomData.length}"
+        /** Open-source defaults from n0madic/go-hdrezka + common public mirrors. */
+        private val MIRRORS = listOf(
+            "https://hdrezka-home.tv",
+            "https://hdrezka.ag",
+            "https://rezka.ag",
+            "https://hdrzk.org",
+            "https://hdrezka.co",
+            "https://rezka-ua.in",
         )
 
-        val solved = solveAnubisPow(randomData, diff) ?: return
-        val (nonce, response) = solved
+        private val ANUBIS_SCRIPT = Regex(
+            """<script[^>]*id=["']anubis_challenge["'][^>]*>([\s\S]*?)</script>""",
+            RegexOption.IGNORE_CASE,
+        )
+        private val ANUBIS_PREFIX = Regex(
+            """<script[^>]*id=["']anubis_base_prefix["'][^>]*>([\s\S]*?)</script>""",
+            RegexOption.IGNORE_CASE,
+        )
+    }
 
-        val elapsed = (System.currentTimeMillis() - started)
-            .coerceAtLeast(50L)
+    @Volatile
+    private var mirrorReady = false
 
-        val basePrefix = ANUBIS_PREFIX.find(html)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.trim()
-            ?.trim('"')
-            ?.trim()
-            .orEmpty()
+    private fun isAnubisChallenge(html: String): Boolean =
+        html.contains("anubis_challenge", ignoreCase = true) ||
+            html.contains("не бот")
 
+    /** Keep [mainUrl] on the host OkHttp actually landed on (ag → home.tv redirects). */
+    private fun syncMainUrl(finalUrl: String?) {
+        if (finalUrl.isNullOrBlank()) return
+        try {
+            val u = java.net.URI(finalUrl)
+            if (!u.scheme.isNullOrBlank() && !u.host.isNullOrBlank()) {
+                mainUrl = "${u.scheme}://${u.host}"
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Anubis 1.25 "fast" PoW: leading zero **bytes** (and high nibble if odd difficulty),
+     * matching `sha256-purejs.mjs` worker — not hex-char prefix alone.
+     */
+    private fun solveAnubisPow(randomData: String, difficulty: Int): Pair<Int, String> {
+        val fullBytes = difficulty / 2
+        val odd = difficulty % 2 != 0
+        val md = MessageDigest.getInstance("SHA-256")
+        var nonce = 0
+        while (true) {
+            val digest = md.digest("$randomData$nonce".toByteArray(Charsets.UTF_8))
+            md.reset()
+            var ok = true
+            for (i in 0 until fullBytes) {
+                if (digest[i] != 0.toByte()) {
+                    ok = false
+                    break
+                }
+            }
+            if (ok && odd && ((digest[fullBytes].toInt() and 0xff) shr 4) != 0) {
+                ok = false
+            }
+            if (ok) {
+                val hex = buildString(digest.size * 2) {
+                    for (b in digest) append("%02x".format(b))
+                }
+                return nonce to hex
+            }
+            nonce++
+            if (nonce > 50_000_000) error("Anubis PoW too hard")
+        }
+    }
+
+    private suspend fun passAnubisChallenge(html: String, redir: String) {
+        val raw = ANUBIS_SCRIPT.find(html)?.groupValues?.getOrNull(1)?.trim() ?: return
+        val payload = tryParseJson<AnubisPayload>(raw) ?: return
+        val ch = payload.challenge ?: return
+        val randomData = ch.randomData ?: return
+        val id = ch.id ?: return
+        val diff = payload.rules?.difficulty ?: ch.difficulty ?: 4
+        val started = System.currentTimeMillis()
+        val (nonce, response) = solveAnubisPow(randomData, diff)
+        val elapsed = (System.currentTimeMillis() - started).coerceAtLeast(50L)
+        val basePrefix = ANUBIS_PREFIX.find(html)?.groupValues?.getOrNull(1)
+            ?.trim()?.trim('"')?.trim().orEmpty()
         val q = listOf(
             "id" to id,
             "response" to response,
             "nonce" to nonce.toString(),
+            // Homepage redir is required — film URL as redir yields HTTP 500 on the title page.
             "redir" to redir,
             "elapsedTime" to elapsed.toString(),
         ).joinToString("&") { (k, v) ->
             "$k=${URLEncoder.encode(v, "UTF-8")}"
         }
-
+        // Pass on the SAME host that issued the challenge (cookie domain must match).
+        // Auth cookies land in [http] CookieJar — bare app.get would discard them.
         val pass = http.get(
             "$mainUrl$basePrefix/.within.website/x/cmd/anubis/api/pass-challenge?$q",
             referer = redir,
             timeout = 35_000,
         )
-
-        val auth = pass.cookies.keys.filter {
-            it.contains("anubis", ignoreCase = true)
-        }
-
+        val auth = pass.cookies.keys.filter { it.contains("anubis", ignoreCase = true) }
         Log.i(
             "HDrezka",
-            "anubis pass code=${pass.code} authCookies=$auth " +
-                "jarHas=${pass.cookies.isNotEmpty()} nonce=$nonce ${elapsed}ms"
+            "anubis pass code=${pass.code} authCookies=$auth jarHas=${pass.cookies.isNotEmpty()} nonce=$nonce ${elapsed}ms",
         )
     }
 
-
-    private fun syncMainUrl(finalUrl: String) {
-        try {
-            val uri = java.net.URI(finalUrl)
-
-            val scheme = uri.scheme ?: return
-            val host = uri.host ?: return
-
-            mainUrl = "$scheme://$host"
-        } catch (_: Exception) {
-        // Ignore invalid redirect URL
-        }
-    }
-
-    private suspend fun fetchDocument(
-        url: String,
-        timeout: Long = 30_000,
-    ): org.jsoup.nodes.Document {
-        var response = http.get(
-            url,
-            timeout = timeout,
-        )
-
-        syncMainUrl(response.url)
-
-        var html = response.text
-
+    /** GET that clears Anubis via homepage auth cookie when challenged. */
+    private suspend fun fetchDocument(url: String, timeout: Long = 20_000): Document {
+        var resp = http.get(url, timeout = timeout)
+        syncMainUrl(resp.url)
+        var html = resp.text
         if (isAnubisChallenge(html)) {
-            passAnubisChallenge(
-                html = html,
-                redir = "$mainUrl/"
-            )
-
-            response = http.get(
-                url,
-                timeout = timeout,
-            )
-
-            syncMainUrl(response.url)
-
-            html = response.text
+            passAnubisChallenge(html, redir = "$mainUrl/")
+            val retryUrl = when {
+                resp.url?.startsWith("http") == true -> {
+                    // Same path on the synced host
+                    val path = try {
+                        java.net.URI(resp.url!!).rawPath + (java.net.URI(resp.url!!).rawQuery?.let { "?$it" } ?: "")
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (path != null) "$mainUrl$path" else pageUrl(url)
+                }
+                else -> pageUrl(url)
+            }
+            resp = http.get(retryUrl, timeout = timeout)
+            syncMainUrl(resp.url)
+            html = resp.text
         }
-
-        return Jsoup.parse(
-            html,
-            response.url
-        )
+        return Jsoup.parse(html, resp.url ?: url)
     }
 
-    private val ANUBIS_SCRIPT = Regex(
-        """<script[^>]*id=["']anubis_challenge["'][^>]*>([\s\S]*?)</script>""",
-        RegexOption.IGNORE_CASE
+    private fun filmPath(url: String): String {
+        return try {
+            val u = java.net.URI(if (url.startsWith("http")) url else pageUrl(url))
+            (u.rawPath ?: "/") + (u.rawQuery?.let { "?$it" } ?: "")
+        } catch (_: Exception) {
+            url.substringAfter(mainUrl, url).let { if (it.startsWith("/")) it else "/$it" }
+        }
+    }
+
+    private fun isUsableFilmPage(doc: Document): Boolean {
+        if (isAnubisChallenge(doc.html())) return false
+        val hasFavs = !doc.selectFirst("input#ctrl_favs")?.attr("value").isNullOrBlank()
+        val hasTr = doc.select("ul#translators-list li").isNotEmpty()
+        val hasTitle = doc.selectFirst("div.b-post__title h1, div.b-post__origtitle") != null
+        return hasTitle && (hasFavs || hasTr)
+    }
+
+    /**
+     * Film pages are host-sensitive (Anubis cookies + dead mirrors like rezka-ua.in).
+     * Try path on current host, then every mirror after clearing Anubis on that host.
+     */
+    private suspend fun fetchFilmDocument(url: String): Pair<Document, String> {
+        val path = filmPath(url)
+        val tried = LinkedHashSet<String>()
+        val candidates = mutableListOf<String>()
+        candidates += pageUrl(url)
+        candidates += "$mainUrl$path"
+        for (m in MIRRORS) {
+            candidates += m.trimEnd('/') + path
+        }
+        var lastDoc: Document? = null
+        var lastUrl = pageUrl(url)
+        for (candidate in candidates) {
+            if (!tried.add(candidate)) continue
+            try {
+                // Warm Anubis on this host's homepage first (film redir breaks).
+                val host = try {
+                    val u = java.net.URI(candidate)
+                    "${u.scheme}://${u.host}"
+                } catch (_: Exception) {
+                    mainUrl
+                }
+                var home = http.get("$host/", timeout = 12_000)
+                syncMainUrl(home.url)
+                if (isAnubisChallenge(home.text)) {
+                    passAnubisChallenge(home.text, redir = "$mainUrl/")
+                }
+                val doc = fetchDocument(candidate)
+                lastDoc = doc
+                lastUrl = candidate
+                if (isUsableFilmPage(doc)) {
+                    syncMainUrl(candidate)
+                    Log.i("HDrezka", "film OK $candidate translators=${doc.select("ul#translators-list li").size}")
+                    return doc to candidate
+                }
+                Log.w(
+                    "HDrezka",
+                    "film unusable $candidate len=${doc.html().length} anubis=${isAnubisChallenge(doc.html())}",
+                )
+            } catch (t: Throwable) {
+                Log.w("HDrezka", "film try failed $candidate: ${t.message}")
+            }
+        }
+        return (lastDoc ?: fetchDocument(pageUrl(url))) to lastUrl
+    }
+
+    private suspend fun ensureWorkingMirror() {
+        if (mirrorReady) return
+        for (mirror in MIRRORS) {
+            try {
+                val base = mirror.trimEnd('/')
+                var resp = http.get(base, timeout = 12_000)
+                syncMainUrl(resp.url)
+                var html = resp.text
+                if (isAnubisChallenge(html)) {
+                    passAnubisChallenge(html, redir = "$mainUrl/")
+                    resp = http.get(mainUrl, timeout = 12_000)
+                    syncMainUrl(resp.url)
+                    html = resp.text
+                }
+                val doc = Jsoup.parse(html, resp.url ?: base)
+                val ok = doc.selectFirst("div.b-content__inline_items, #search, form#search") != null
+                    || doc.select("div.b-content__inline_item").isNotEmpty()
+                    || doc.selectFirst("a[href*=/films/], a[href*=/series/]") != null
+                    || html.length > 20_000
+                if (ok && !isAnubisChallenge(html)) {
+                    mirrorReady = true
+                    return
+                }
+            } catch (_: Exception) {
+                // try next
+            }
+        }
+        // Keep constructor default if nothing answered
+        mirrorReady = true
+    }
+
+    private fun pageUrl(pathQuery: String): String {
+        val p = pathQuery.trim()
+        if (p.startsWith("http://") || p.startsWith("https://")) {
+            // Keep the search-result host (often hdrezka-home.tv); only rewrite path onto
+            // current mainUrl when we already synced to that mirror.
+            return try {
+                val u = java.net.URI(p)
+                val path = u.rawPath ?: "/"
+                val q = u.rawQuery?.let { "?$it" }.orEmpty()
+                val host = u.host
+                if (!host.isNullOrBlank() && mainUrl.contains(host, ignoreCase = true)) {
+                    p
+                } else if (!host.isNullOrBlank()) {
+                    // Prefer the URL's own host — Anubis cookies are host-scoped.
+                    "${u.scheme}://$host$path$q"
+                } else {
+                    "$mainUrl$path$q"
+                }
+            } catch (_: Exception) {
+                p
+            }
+        }
+        return mainUrl + if (p.startsWith("/")) p else "/$p"
+    }
+
+    // Paths only — host resolved via [ensureWorkingMirror]
+    override val mainPage = mainPageOf(
+        "/films/?filter=last" to "фильмы — новинки",
+        "/films/?filter=watching" to "фильмы — смотрят",
+        "/films/?filter=popular" to "фильмы — популярные",
+        "/series/?filter=last" to "сериалы — новинки",
+        "/series/?filter=watching" to "сериалы — смотрят",
+        "/series/?filter=popular" to "сериалы — популярные",
+        "/cartoons/?filter=last" to "мультфильмы — новинки",
+        "/cartoons/?filter=watching" to "мультфильмы — смотрят",
+        "/animation/?filter=last" to "аниме — новинки",
+        "/animation/?filter=watching" to "аниме — смотрят",
     )
 
-    private val ANUBIS_PREFIX = Regex(
-        """<script[^>]*id=["']anubis_base_prefix["'][^>]*>([\s\S]*?)</script>""",
-        RegexOption.IGNORE_CASE
-    )
-
-    private fun isAnubisChallenge(html: String): Boolean {
-        return html.contains("anubis_challenge", ignoreCase = true) ||
-                html.contains("не бот", ignoreCase = true)
-    }
-
-    private fun pageUrl(path: String): String {
-        if (path.startsWith("http://") || path.startsWith("https://")) {
-            return path
-        }
-
-        return if (path.startsWith("/")) {
-            "$mainUrl$path"
-        } else {
-            "$mainUrl/$path"
-        }
-    }
-    
-
-
-    
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val url = request.data.split("?", limit = 2)
-
-        val path = url.first()
-        val query = url.getOrNull(1).orEmpty()
-
-        val document = fetchDocument(
-            pageUrl("$path" + "page/$page/" + if (query.isNotEmpty()) "?$query" else "")
-        )
-
-        val home = document
-            .select("div.b-content__inline_items div.b-content__inline_item")
-            .map { it.toSearchResult() }
+        ensureWorkingMirror()
+        val parts = request.data.split("?", limit = 2)
+        val path = parts.first()
+        val query = parts.getOrNull(1)?.let { "?$it" }.orEmpty()
+        val home = fetchDocument(pageUrl("${path}page/$page/$query")).select(
+            "div.b-content__inline_items div.b-content__inline_item"
+        ).map {
+            it.toSearchResult()
+        }
 
         return newHomePageResponse(request.name, home)
     }
 
     private fun Element.toSearchResult(): SearchResponse {
-
-        val title = selectFirst(
-            "div.b-content__inline_item-link > a"
-        )?.text()?.trim().orEmpty()
-
-        val href = selectFirst("a")
-            ?.attr("href")
-            .orEmpty()
-
-        val poster = select("img")
-            .attr("src")
-
-        val isSeries = select("span.info").isNotEmpty()
-
-        return if (!isSeries) {
-
-            newMovieSearchResponse(
-                title,
-                href,
-                TvType.Movie
-            ) {
-                posterUrl = poster
+        val title =
+            this.selectFirst("div.b-content__inline_item-link > a")?.text()?.trim().toString()
+        val href = this.selectFirst("a")?.attr("href").toString()
+        val posterUrl = this.select("img").attr("src")
+        val year = this.selectFirst("div.b-content__inline_item-link > div")?.text()
+            ?.let { Regex("""(?:19|20)\d{2}""").find(it)?.value?.toIntOrNull() }
+            ?: Regex("""(?<![0-9])((?:19|20)\d{2})(?![0-9])""").findAll(href)
+                .mapNotNull { it.groupValues[1].toIntOrNull() }.lastOrNull()
+        val type = if (this.select("span.info").isNotEmpty()) TvType.TvSeries else TvType.Movie
+        return if (type == TvType.Movie) {
+            newMovieSearchResponse(title, href, TvType.Movie) {
+                this.posterUrl = posterUrl
+                this.year = year
             }
-
         } else {
-
-            val episode = Regex("[^0-9]")
-                .replace(
-                    select("span.info")
-                        .text()
-                        .substringAfter(","),
-                    ""
-            )
-                .toIntOrNull()
-
-            newAnimeSearchResponse(
-                title,
-                href,
-                TvType.TvSeries
-            ) {
-                posterUrl = poster
+            val episode =
+                this.select("span.info").text().substringAfter(",").replace(Regex("[^0-9]"), "")
+                    .toIntOrNull()
+            newAnimeSearchResponse(title, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
+                this.year = year
                 addDubStatus(
-                    true,
-                    true,
-                    episode,
-                    episode
+                    dubExist = true,
+                    dubEpisodes = episode,
+                    subExist = true,
+                    subEpisodes = episode
                 )
             }
         }
     }
 
-    override suspend fun search(
-        query: String
-    ): List<SearchResponse> {
+    override suspend fun search(query: String): List<SearchResponse> {
+        ensureWorkingMirror()
+        val link = "$mainUrl/search/?do=search&subaction=search&q=$query"
+        val document = fetchDocument(link)
 
-        val document = fetchDocument(
-            "$mainUrl/search/?do=search&subaction=search&q=$query"
-        )
-
-        return document
-            .select(
-                "div.b-content__inline_items div.b-content__inline_item"
-            )
-            .map {
-                it.toSearchResult()
-            }
+        return document.select("div.b-content__inline_items div.b-content__inline_item").map {
+            it.toSearchResult()
+        }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(
-            url,
-            
-        ).document
+        ensureWorkingMirror()
+        val (document, resolved) = fetchFilmDocument(url)
 
-        val id = url.split("/").last().split("-").first()
-        val title = (document.selectFirst("div.b-post__title h1")?.text()?.trim()
-            ?: document.selectFirst("div.b-post__origtitle")?.text()?.trim()).toString()
+        val id = resolved.split("/").last().split("-").first()
+        val title = (document.selectFirst("div.b-post__origtitle")?.text()?.trim()
+            ?: document.selectFirst("div.b-post__title h1")?.text()?.trim()).toString()
         val poster = fixUrlNull(document.selectFirst("div.b-sidecover img")?.attr("src"))
         val tags =
             document.select("table.b-post__info > tbody > tr:contains(Жанр) span[itemprop=genre]")
@@ -377,17 +394,15 @@ class HDrezkaProvider : MainAPI() {
                 .isNullOrEmpty()
         ) TvType.Movie else TvType.TvSeries
         val description = document.selectFirst("div.b-post__description_text")?.text()?.trim()
-        val trailer = app.post(
+        val trailer = http.post(
             "$mainUrl/engine/ajax/gettrailervideo.php",
             data = mapOf("id" to id),
-            referer = url,
-            
+            referer = resolved
         ).parsedSafe<Trailer>()?.code.let {
             Jsoup.parse(it.toString()).select("iframe").attr("src")
         }
-        val ratingText =
+        val rating =
             document.selectFirst("table.b-post__info > tbody > tr:nth-child(1) span.bold")?.text()
-        val score = ratingText?.toDoubleOrNull()?.let { Score.from10(it) }
         val actors =
             document.select("table.b-post__info > tbody > tr:last-child span.item").mapNotNull {
                 Actor(
@@ -396,124 +411,78 @@ class HDrezkaProvider : MainAPI() {
                 )
             }
 
-        val recommendations = buildList {
-            // Старые рекомендации
-            addAll(
-                document.select("div.b-sidelist div.b-content__inline_item")
-                    .mapNotNull { it.toSearchResult() }
-            )
-
-    // Новые рекомендации
-            addAll(
-                document.select("div.b-post__partcontent_item[data-url]")
-                    .mapNotNull { item ->
-                        val href = item.attr("data-url")
-                            .ifBlank { item.selectFirst("a")?.attr("href") ?: "" }
-
-                        val title = item.selectFirst(".title")?.text()?.trim()
-                            ?: item.selectFirst("a")?.text()?.trim()
-                            ?: return@mapNotNull null
-
-                        val year = item.selectFirst(".year")
-                            ?.text()
-                            ?.filter(Char::isDigit)
-                            ?.toIntOrNull()
-
-                        val num = item.selectFirst(".td.num")?.text()?.trim().orEmpty()
-
-                        newMovieSearchResponse(
-                            "$num. $title",
-                            fixUrl(href),
-                            TvType.Movie
-                        ) {
-                            this.year = year
-                        }
-                    }
-            )
-        }.distinctBy { it.url }
+        val recommendations = document.select("div.b-sidelist div.b-content__inline_item").map {
+            it.toSearchResult()
+        }
 
         val data = HashMap<String, Any>()
         val server = ArrayList<Map<String, String>>()
 
         data["id"] = id
-        data["favs"] = document.selectFirst("input#ctrl_favs")?.attr("value").toString()
-        data["ref"] = url
+        data["favs"] = document.selectFirst("input#ctrl_favs")?.attr("value").orEmpty()
+        data["ref"] = resolved
 
         return if (tvType == TvType.TvSeries) {
-            // Забираємо всі li та a всередині ul#translators-list
-            val translators = document.select("#translators-list li, #translators-list a")
-            if (translators.isNotEmpty()) {
-                translators.map { res ->
-                    server.add(
-                        mapOf(
-                            "translator_name" to res.text().trim(),
-                            "translator_id" to res.attr("data-translator_id"),
-                        )
+            // Series-only: movies keep the branch below untouched.
+            val seenTr = LinkedHashSet<String>()
+            document.select("ul#translators-list li").forEach { res ->
+                val node = res.selectFirst("[data-translator_id]") ?: res
+                val tid = node.attr("data-translator_id").ifBlank {
+                    res.attr("data-translator_id")
+                }
+                if (tid.isBlank() || !seenTr.add(tid)) return@forEach
+                server.add(
+                    mapOf(
+                        "translator_name" to (node.attr("title").ifBlank { node.text() }).trim(),
+                        "translator_id" to tid,
                     )
-                }
-            } else {
-                // Extracts the default translator_id from the init script if translation list is missing
-                document.select("script").map { script ->
-                    val match = Regex("initCDNSeriesEvents\\(\\d+, (\\d+)").find(script.data())
-                    if (match != null) {
-                        server.add(
-                            mapOf(
-                                "translator_name" to "HDrezka",
-                                "translator_id" to match.groupValues[1]
-                            )
-                        )
-                    }
-                }
+                )
             }
-            val episodes = document.select(
-                    "#simple-episodes-tabs .b-simple_episode__item"
-                ).map { ep ->
 
-                    val season = ep.attr("data-season_id").toIntOrNull()
-                    val episode = ep.attr("data-episode_id").toIntOrNull()
+            // Site uses <a class="b-simple_episode__item">, not <ul><li> — old
+            // "ul li" selector returned 0 episodes for Simpsons / long-running shows.
+            val episodeKeys = LinkedHashSet<Pair<Int, Int>>()
+            collectEpisodePairs(document).forEach { episodeKeys += it }
+            // Initial DOM often only has the latest seasons for the default voiceover.
+            // get_episodes expands the full S×E grid for a translator (e.g. 2x2 → S1…).
+            expandSeriesEpisodes(id, data["favs"] as String, resolved, server, episodeKeys)
 
-                    val name = ep.selectFirst(".b-simple_episode__title")
-                        ?.text()
-                        ?.ifBlank { "Episode $episode" }
-                        ?: "Episode $episode"
-
-                    data["season"] = "$season"
-                    data["episode"] = "$episode"
-                    data["server"] = server
-                    data["action"] = "get_stream"
-
-                    newEpisode(data.toJson()) {
-                        this.name = name
-                        this.season = season
-                        this.episode = episode
-                    }
+            val episodes = episodeKeys.sortedWith(compareBy({ it.first }, { it.second })).map { (season, episode) ->
+                val episodeData = HashMap<String, Any>(data).apply {
+                    this["season"] = "$season"
+                    this["episode"] = "$episode"
+                    this["server"] = server
+                    this["action"] = "get_stream"
                 }
+                newEpisode(episodeData.toJson(), {
+                    this.name = "Episode $episode"
+                    this.season = season
+                    this.episode = episode
+                }, fix = false)
+            }
+            Log.i(
+                "HDrezka",
+                "load series id=$id host=$mainUrl translators=${server.size} episodes=${episodes.size} " +
+                    "seasons=${episodeKeys.map { it.first }.toSet().sorted()} anubisLeft=${isAnubisChallenge(document.html())}",
+            )
 
-            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+            newTvSeriesLoadResponse(title, resolved, TvType.TvSeries, episodes) {
                 this.posterUrl = poster
                 this.year = year
                 this.plot = description
                 this.tags = tags
-                this.score = score
+                this.score = Score.from10(rating)
                 addActors(actors)
                 this.recommendations = recommendations
                 addTrailer(trailer)
             }
         } else {
-            val translators = document.select("#translators-list li, #translators-list a")
-
-            translators.forEach { el ->
-                val node = if (el.tagName() == "li") {
-                    el.selectFirst("a") ?: el
-                } else el
-
-                val id = node.attr("data-translator_id")
-                if (id.isNullOrBlank()) return@forEach // пропускаємо сміття
-
+            document.select("ul#translators-list li").map { res ->
+                val node = res.selectFirst("a[data-translator_id]") ?: res
                 server.add(
                     mapOf(
-                        "translator_name" to node.text().trim(),
-                        "translator_id" to id,
+                        "translator_name" to (node.attr("title").ifBlank { node.text() }),
+                        "translator_id" to node.attr("data-translator_id"),
                         "camrip" to node.attr("data-camrip"),
                         "ads" to node.attr("data-ads"),
                         "director" to node.attr("data-director")
@@ -523,13 +492,17 @@ class HDrezkaProvider : MainAPI() {
 
             data["server"] = server
             data["action"] = "get_movie"
+            Log.i(
+                "HDrezka",
+                "load movie id=$id host=$mainUrl translators=${server.size} anubisLeft=${isAnubisChallenge(document.html())}",
+            )
 
-            newMovieLoadResponse(title, url, TvType.Movie, data.toJson()) {
+            newMovieLoadResponse(title, resolved, TvType.Movie, data.toJson()) {
                 this.posterUrl = poster
                 this.year = year
                 this.plot = description
                 this.tags = tags
-                this.score = score
+                this.score = Score.from10(rating)
                 addActors(actors)
                 this.recommendations = recommendations
                 addTrailer(trailer)
@@ -537,10 +510,71 @@ class HDrezkaProvider : MainAPI() {
         }
     }
 
+    /** Episode nodes on series pages (anchors or list items). */
+    private fun collectEpisodePairs(root: org.jsoup.nodes.Element): List<Pair<Int, Int>> {
+        return root.select(
+            "div#simple-episodes-tabs a.b-simple_episode__item, " +
+                "div#simple-episodes-tabs li.b-simple_episode__item, " +
+                "ul.b-simple_episodes__list [data-season_id][data-episode_id], " +
+                "[data-season_id][data-episode_id]"
+        ).mapNotNull { el ->
+            val season = el.attr("data-season_id").toIntOrNull() ?: return@mapNotNull null
+            val episode = el.attr("data-episode_id").toIntOrNull() ?: return@mapNotNull null
+            season to episode
+        }
+    }
+
+    /**
+     * Long-running series only ship the latest seasons in the first HTML.
+     * Merge episode grids from get_episodes across voiceovers until season 1
+     * appears (or a few translators were tried). Movie path never calls this.
+     */
+    private suspend fun expandSeriesEpisodes(
+        id: String,
+        favs: String,
+        referer: String,
+        translators: List<Map<String, String>>,
+        into: LinkedHashSet<Pair<Int, Int>>,
+    ) {
+        if (translators.isEmpty()) return
+        val before = into.size
+        for (tr in translators.take(6)) {
+            val tid = tr["translator_id"] ?: continue
+            try {
+                val ajax = http.post(
+                    url = "$mainUrl/ajax/get_cdn_series/?t=${Date().time}",
+                    data = mapOf(
+                        "id" to id,
+                        "translator_id" to tid,
+                        "favs" to favs,
+                        "season" to "1",
+                        "action" to "get_episodes",
+                    ),
+                    referer = referer,
+                ).parsedSafe<EpisodesAjax>() ?: continue
+                if (ajax.success == false) continue
+                val html = buildString {
+                    append(ajax.episodes.orEmpty())
+                    append(ajax.seasons.orEmpty())
+                }
+                if (html.isBlank()) continue
+                collectEpisodePairs(Jsoup.parse(html)).forEach { into += it }
+            } catch (t: Throwable) {
+                Log.w("HDrezka", "get_episodes failed tr=$tid: ${t.message}")
+            }
+            // Early seasons present → catalog S1/S2 lookups will work.
+            if (into.any { it.first == 1 }) break
+        }
+        Log.i("HDrezka", "expand episodes $before → ${into.size}")
+    }
+
     private fun decryptStreamUrl(data: String): String {
-        // If the URL is already in plain text (starts with quality marker like [360p]),
-        // skip decryption — HDrezka no longer encrypts stream URLs
-        if (data.startsWith("[")) return data
+        // Newer mirrors sometimes return cleartext "[720p]https://... ,[1080p]https://..."
+        // instead of the legacy #h / //_// trash-encoded blob.
+        val trimmed = data.trim()
+        if (trimmed.contains("[") && trimmed.contains("http") && !trimmed.contains("#h")) {
+            return trimmed.replace("\\/", "/")
+        }
 
         fun getTrash(arr: List<String>, item: Int): List<String> {
             val trash = ArrayList<List<String>>()
@@ -567,8 +601,12 @@ class HDrezkaProvider : MainAPI() {
             trashString = trashString.replace(temp, "")
         }
 
-        return base64Decode(trashString)
-
+        return try {
+            base64Decode(trashString)
+        } catch (_: Exception) {
+            // Last resort: treat as cleartext if decode fails
+            trimmed.replace("\\/", "/")
+        }
     }
 
     private suspend fun cleanCallback(
@@ -620,27 +658,27 @@ class HDrezkaProvider : MainAPI() {
         subCallback: (SubtitleFile) -> Unit,
         sourceCallback: (ExtractorLink) -> Unit
     ) {
-        decryptStreamUrl(url).split(",").map { links ->
+        for (links in decryptStreamUrl(url).split(",")) {
             val quality =
                 Regex("\\[([0-9]{3,4}p\\s?\\w*?)]").find(links)?.groupValues?.getOrNull(1)
-                    ?.trim() ?: return@map null
-            links.replace("[$quality]", "").split(" or ")
-                .map {
-                    val link = it.trim()
-                    val type = if(link.contains(".m3u8")) "(Main)" else "(Backup)"
-                    cleanCallback(
-                        "$source $type",
-                        link,
-                        quality,
-                        link.contains(".m3u8"),
-                        sourceCallback,
-                    )
-                }
+                    ?.trim() ?: continue
+            for (raw in links.replace("[$quality]", "").split(" or ")) {
+                val link = raw.trim()
+                val type = if (link.contains(".m3u8")) "Main" else "Backup"
+                // "Studio • 1080p (Main)" — voiceover picker parses studio before quality
+                cleanCallback(
+                    "$source • $quality ($type)",
+                    link,
+                    quality,
+                    link.contains(".m3u8"),
+                    sourceCallback,
+                )
+            }
         }
 
-        subtitle.split(",").map { sub ->
+        for (sub in subtitle.split(",")) {
             val language =
-                Regex("\\[(.*)]").find(sub)?.groupValues?.getOrNull(1) ?: return@map null
+                Regex("\\[(.*)]").find(sub)?.groupValues?.getOrNull(1) ?: continue
             val link = sub.replace("[$language]", "").trim()
             subCallback.invoke(
                 newSubtitleFile(
@@ -657,13 +695,11 @@ class HDrezkaProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        ensureWorkingMirror()
 
         tryParseJson<Data>(data)?.let { res ->
             if (res.server?.isEmpty() == true) {
-                val document = app.get(
-                    res.ref ?: return@let,
-                    
-                ).document
+                val document = fetchDocument(res.ref ?: return@let)
                 document.select("script").map { script ->
                     if (script.data().contains("sof.tv.initCDNMoviesEvents(")) {
                         val dataJson =
@@ -680,8 +716,8 @@ class HDrezkaProvider : MainAPI() {
                     }
                 }
             } else {
-                res.server?.map { server ->
-                    app.post(
+                res.server?.amap { server ->
+                    http.post(
                         url = "$mainUrl/ajax/get_cdn_series/?t=${Date().time}",
                         data = mapOf(
                             "id" to res.id,
@@ -693,10 +729,8 @@ class HDrezkaProvider : MainAPI() {
                             "season" to res.season,
                             "episode" to res.episode,
                             "action" to res.action,
-                        ).filterValues { it != null }
-                            .mapValues { it.value as String },
-                        referer = res.ref,
-                        
+                        ).filterValues { it != null }.mapValues { it.value as String },
+                        referer = res.ref
                     ).parsedSafe<Sources>()?.let { source ->
                         invokeSources(
                             server.translator_name.toString(),
@@ -712,6 +746,13 @@ class HDrezkaProvider : MainAPI() {
 
         return true
     }
+
+    data class EpisodesAjax(
+        @JsonProperty("success") val success: Boolean? = null,
+        @JsonProperty("episodes") val episodes: String? = null,
+        @JsonProperty("seasons") val seasons: String? = null,
+        @JsonProperty("message") val message: String? = null,
+    )
 
     data class LocalSources(
         @JsonProperty("streams") val streams: String,
@@ -745,7 +786,7 @@ class HDrezkaProvider : MainAPI() {
         @JsonProperty("success") val success: Boolean?,
         @JsonProperty("code") val code: String?,
     )
-    
+
     data class AnubisPayload(
         @JsonProperty("rules") val rules: AnubisRules? = null,
         @JsonProperty("challenge") val challenge: AnubisChallenge? = null,
@@ -761,5 +802,5 @@ class HDrezkaProvider : MainAPI() {
         @JsonProperty("randomData") val randomData: String? = null,
         @JsonProperty("difficulty") val difficulty: Int? = null,
         @JsonProperty("method") val method: String? = null,
-)
+    )
 }
