@@ -460,7 +460,6 @@ class HDrezkaProvider : MainAPI() {
         return if (tvType == TvType.TvSeries) {
             // Series-only: movies keep the branch below untouched.
             val translators = document.select("#translators-list li, #translators-list a")
-
             if (translators.isNotEmpty()) {
                 translators.forEach { res ->
                     val node = if (res.tagName() == "li") {
@@ -468,25 +467,21 @@ class HDrezkaProvider : MainAPI() {
                     } else {
                         res
                     }
-
+        
                     val tid = node.attr("data-translator_id")
-
-                    if (tid.isNullOrBlank()) return@forEach
-
+                    if (tid.isBlank()) return@forEach
                     server.add(
                         mapOf(
-                            "translator_name" to node.text().trim(),
+                            "translator_name" to res.text().trim(),
                             "translator_id" to tid,
                         )
                     )
                 }
             } else {
-    // Fallback, якщо список озвучок відсутній у DOM
                 document.select("script").forEach { script ->
                     val match = Regex(
                         """initCDNSeriesEvents\(\d+,\s*(\d+)"""
                     ).find(script.data())
-
                     if (match != null) {
                         server.add(
                             mapOf(
