@@ -246,7 +246,17 @@ class HDrezkaProvider : MainAPI() {
                 html.contains("не бот", ignoreCase = true)
     }
 
-    
+    private fun pageUrl(path: String): String {
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            return path
+        }
+
+        return if (path.startsWith("/")) {
+            "$mainUrl$path"
+        } else {
+            "$mainUrl/$path"
+        }
+    }
     
 
 
@@ -255,11 +265,13 @@ class HDrezkaProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-
         val url = request.data.split("?", limit = 2)
 
+        val path = url.first()
+        val query = url.getOrNull(1).orEmpty()
+
         val document = fetchDocument(
-            "${url.first()}page/$page/?${url.last()}"
+            pageUrl("$path" + "page/$page/" + if (query.isNotEmpty()) "?$query" else "")
         )
 
         val home = document
