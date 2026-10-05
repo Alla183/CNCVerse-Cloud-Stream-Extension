@@ -459,19 +459,43 @@ class HDrezkaProvider : MainAPI() {
 
         return if (tvType == TvType.TvSeries) {
             // Series-only: movies keep the branch below untouched.
-            val seenTr = LinkedHashSet<String>()
-            document.select("ul#translators-list li").forEach { res ->
-                val node = res.selectFirst("[data-translator_id]") ?: res
-                val tid = node.attr("data-translator_id").ifBlank {
-                    res.attr("data-translator_id")
-                }
-                if (tid.isBlank() || !seenTr.add(tid)) return@forEach
-                server.add(
-                    mapOf(
-                        "translator_name" to (node.attr("title").ifBlank { node.text() }).trim(),
-                        "translator_id" to tid,
+            val translators = document.select("#translators-list li, #translators-list a")
+
+            if (translators.isNotEmpty()) {
+                translators.forEach { res ->
+                    val node = if (res.tagName() == "li") {
+                        res.selectFirst("a") ?: res
+                    } else {
+                        res
+                    }
+
+                    val tid = node.attr("data-translator_id")
+
+                    if (tid.isNullOrBlank()) return@forEach
+
+                    server.add(
+                        mapOf(
+                            "translator_name" to node.text().trim(),
+                            "translator_id" to tid,
+                        )
                     )
-                )
+                }
+            } else {
+    // Fallback, якщо список озвучок відсутній у DOM
+                document.select("script").forEach { script ->
+                    val match = Regex(
+                        """initCDNSeriesEvents\(\d+,\s*(\d+)"""
+                    ).find(script.data())
+
+                    if (match != null) {
+                        server.add(
+                            mapOf(
+                                "translator_name" to "HDrezka",
+                                "translator_id" to match.groupValues[1],
+                            )
+                        )
+                    }
+                }
             }
 
             // Site uses <a class="b-simple_episode__item">, not <ul><li> — old
@@ -512,15 +536,25 @@ class HDrezkaProvider : MainAPI() {
                 addTrailer(trailer)
             }
         } else {
-            document.select("ul#translators-list li").map { res ->
-                val node = res.selectFirst("a[data-translator_id]") ?: res
+            val translators = document.select("#translators-list li, #translators-list a")
+
+            translators.forEach { el ->
+                val node = if (el.tagName() == "li") {
+                    el.selectFirst("a") ?: el
+                } else {
+                    el
+                }
+
+                val tid = node.attr("data-translator_id")
+                if (tid.isBlank()) return@forEach
+
                 server.add(
                     mapOf(
-                        "translator_name" to (node.attr("title").ifBlank { node.text() }),
-                        "translator_id" to node.attr("data-translator_id"),
+                        "translator_name" to node.text().trim(),
+                        "translator_id" to tid,
                         "camrip" to node.attr("data-camrip"),
                         "ads" to node.attr("data-ads"),
-                        "director" to node.attr("data-director")
+                        "director" to node.attr("data-director"),
                     )
                 )
             }
