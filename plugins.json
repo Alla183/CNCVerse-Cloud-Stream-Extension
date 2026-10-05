@@ -126,10 +126,10 @@
     },
     {
         "iconUrl": "https://www.google.com/s2/favicons?domain=rezka.ag&sz=%size%",
-        "fileHash": "sha256-40f03ca060dd21dc39f0bb75a9f8f626cca6228d95834fc8c636665e5f83ebdc",
+        "fileHash": "sha256-738bc3dbb0aa5942231d138712a11a08cac41a33740842dd09e5bb966c02f863",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 47513,
+        "fileSize": 47514,
         "status": 1,
         "language": "ru",
         "authors": [
@@ -142,7 +142,7 @@
             "TvSeries",
             "Movie"
         ],
-        "version": 11,
+        "version": 12,
         "internalName": "HDrezkaProvider",
         "url": "https://raw.githubusercontent.com/Alla183/CNCVerse-Cloud-Stream-Extension/builds/HDrezkaProvider.cs3",
         "name": "HDrezkaProvider"
