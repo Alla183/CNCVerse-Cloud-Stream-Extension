@@ -1,10 +1,10 @@
 [
     {
         "iconUrl": "https://github.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/raw/refs/heads/master/CastleTvProvider/icon.png",
-        "fileHash": "sha256-1994e02aff341904d5fde5b8cacb0bca362f62507e5fd72100c00455e7144ccb",
+        "fileHash": "sha256-58fe7993107cf0ff437f9649faac76b6972a47d7bdcb95f0372cc084142606a4",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 68820,
+        "fileSize": 69522,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -22,10 +22,10 @@
     },
     {
         "iconUrl": "https://modapk.world/wp-content/uploads/2025/11/Et-90x90.png",
-        "fileHash": "sha256-d29d3ec2eabeac0d547de9917706d01e6a397aa966a26d2fdf683a9367a595d7",
+        "fileHash": "sha256-2aa19e49f689320b8d1f2e21f27ebcf0d28cb86ff3ce506030c991014c294234",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 39966,
+        "fileSize": 40103,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -43,10 +43,10 @@
     },
     {
         "iconUrl": "https://github.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/raw/refs/heads/master/CNC%20Verse/icon.png",
-        "fileHash": "sha256-d7bd603f2dba44b10727c7273aba20c58f2a4324bbb530302170895886e3d00b",
+        "fileHash": "sha256-1f26581bcde36521c01bd7c913259b5837e19b27c49d599fed51457b4507d94a",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 63003,
+        "fileSize": 63209,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -63,31 +63,11 @@
         "name": "CNC Verse"
     },
     {
-        "iconUrl": "https://www.google.com/s2/favicons?domain=desi-serials.to&sz=%size%",
-        "fileHash": "sha256-6e657a1a8dea4123e443d0316fcbcf8de7f1a5ef0677a134b54681eca578e476",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 32482,
-        "status": 1,
-        "language": "hi",
-        "authors": [
-            "NivinCNC"
-        ],
-        "tvTypes": [
-            "TvSeries"
-        ],
-        "version": 1,
-        "internalName": "DesiSerialsProvider",
-        "description": "Desi Serials Tv Shows Provider",
-        "url": "https://raw.githubusercontent.com/Alla183/CNCVerse-Cloud-Stream-Extension/builds/DesiSerialsProvider.cs3",
-        "name": "DesiSerialsProvider"
-    },
-    {
         "iconUrl": "https://github.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/raw/refs/heads/master/DoFlixProvider/icon.png",
-        "fileHash": "sha256-05efb1a6a6605723698cab336c5fa9f3fbbe5e92ccbb36aef43e233e8f99c373",
+        "fileHash": "sha256-664d73a3f81c2e1e1438af322f5d6e20b32137cae9c7369c67fc74c3c8310d6f",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 66550,
+        "fileSize": 67338,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -105,10 +85,10 @@
     },
     {
         "iconUrl": "https://dorama.land/favicon.ico",
-        "fileHash": "sha256-6f5d6f7ffc6ec9d32e43f98938df6c8e1c6887860603b522f44104de3d6cdb8a",
+        "fileHash": "sha256-b3dbcc59003d83a8337a6d8e1a612bc225013e24e8167570fa4c107efa90ad20",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 25437,
+        "fileSize": 25651,
         "status": 1,
         "language": "uk",
         "authors": [
@@ -126,10 +106,10 @@
     },
     {
         "iconUrl": "https://raw.githubusercontent.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/master/EinthusanProvider/icon.png",
-        "fileHash": "sha256-222bfb86a86cf26da8b594a50f7e76c5e9562b62d0ebf102ba0976dc3888dab4",
+        "fileHash": "sha256-54366531cc9cd4cd75566be71aee304e9ded5f2369fe44ec129d3a592b94f487",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 22090,
+        "fileSize": 22094,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -145,11 +125,34 @@
         "name": "EinthusanProvider"
     },
     {
-        "iconUrl": "https://raw.githubusercontent.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/master/MoviezwapProvider/icon.png",
-        "fileHash": "sha256-3f9645f654625c3ff65970dc9a182583244955da4a8fa461ab9036f8c984fa02",
+        "iconUrl": "https://www.google.com/s2/favicons?domain=rezka.ag&sz=%size%",
+        "fileHash": "sha256-4f4684bf3a9bbda66c53741411509437f0dfd9d88d7e5b719e65697bd510c8c4",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 21076,
+        "fileSize": 42858,
+        "status": 1,
+        "language": "ru",
+        "authors": [
+            "Hexated, NivinCNC",
+            "me"
+        ],
+        "tvTypes": [
+            "AsianDrama",
+            "Anime",
+            "TvSeries",
+            "Movie"
+        ],
+        "version": 10,
+        "internalName": "HDrezkaProvider",
+        "url": "https://raw.githubusercontent.com/Alla183/CNCVerse-Cloud-Stream-Extension/builds/HDrezkaProvider.cs3",
+        "name": "HDrezkaProvider"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/master/MoviezwapProvider/icon.png",
+        "fileHash": "sha256-f85abe19147f5ca7432ebfae7ade519dd0f314fa2641e19c79092919a77b1fdd",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
+        "fileSize": 21069,
         "status": 1,
         "language": "te",
         "authors": [
@@ -166,10 +169,10 @@
     },
     {
         "iconUrl": "https://cdn.mytuner.mobi/static/ctr/icons/App_192x192/in.png",
-        "fileHash": "sha256-a6b4e08d2cf13f8ec3275fc05e0fab78163fedbf45f958a16aeec52160981e65",
+        "fileHash": "sha256-2b5dc8c9fa10e1267e4a3c5879f37f29468ceb4d4ac1314ac862cde74eb74a5e",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 17806,
+        "fileSize": 17810,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -186,10 +189,10 @@
     },
     {
         "iconUrl": "https://github.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/raw/refs/heads/master/Rtally/icon.png",
-        "fileHash": "sha256-f949d954edcf1c1a47011f04510200ee364802ee873abc68759ae5e1b84ccb68",
+        "fileHash": "sha256-503cd6fce423ed3420da907714203b9faf9424dbc3cc5291454f78541fc33d9e",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 19512,
+        "fileSize": 19534,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -210,10 +213,10 @@
     },
     {
         "iconUrl": "https://play-lh.googleusercontent.com/7geBQBtW_yN70BU81Oi2SoZvYsj5VoYrI4FmUNdqWQlchtExJb7XE_1BQysGzgJ6mBU",
-        "fileHash": "sha256-252b10bfd7962e3c9544bdd5eab998c3eb09aad0fb73c38f992c43eae0953f7c",
+        "fileHash": "sha256-d1bed2844e0f23516b2757ffc225c6836520cee78bfe650fa26859cb098e33c0",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 44562,
+        "fileSize": 44775,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -232,10 +235,10 @@
     },
     {
         "iconUrl": "https://github.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/raw/refs/heads/master/SunGoProvider/icon.png",
-        "fileHash": "sha256-a77d6d6ffbd9539b8d49d96592f767bfaa78b4dec0fa797430be977c37088c2d",
+        "fileHash": "sha256-bcb10d35c397bae1038f30b1f13452bd966b34e292aca898b66061fe72ffc4f3",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 23057,
+        "fileSize": 23066,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -252,10 +255,10 @@
     },
     {
         "iconUrl": "https://github.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/raw/refs/heads/master/TamilDhoolProvider/icon.png",
-        "fileHash": "sha256-0ad7da9dbc74351ec66d522f5cfaf4e8d8d7291e09844def69e131cc2a02d2b7",
+        "fileHash": "sha256-2b54d8444c25cf2d55b9195050f989f8b7e69eeb40a3fd80d3eab1830fc638f3",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 24726,
+        "fileSize": 24694,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -272,10 +275,10 @@
     },
     {
         "iconUrl": "https://www.google.com/s2/favicons?domain=tamilian.io&sz=%size%",
-        "fileHash": "sha256-04beda1675a724da78b3d7477bf4b862b97a5f59873304742b6382be1a7706e3",
+        "fileHash": "sha256-88f0e1e0e7d0ad17b11662e2426b512b810271a83c1eedc91b7ce3a34e86906c",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 20707,
+        "fileSize": 20795,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -292,10 +295,10 @@
     },
     {
         "iconUrl": "https://github.com/NivinCNC/CNCVerse-Cloud-Stream-Extension/raw/refs/heads/master/TamilUltraProvider/icon.png",
-        "fileHash": "sha256-d1fecdb14676a2e511324022a89c98386136256043611dc1c698bfc5e63d9969",
+        "fileHash": "sha256-d7a82004ee4ea0d677111454bb3e375bbe0283054c91fbdcb9a7b37afae72a8a",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 17521,
+        "fileSize": 17513,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -311,32 +314,11 @@
         "name": "TamilUltraProvider"
     },
     {
-        "iconUrl": "https://editorialge.com/wp-content/uploads/2023/07/Watch32..jpg",
-        "fileHash": "sha256-bf76868823b2c1b3e99cdda033d5d2303b39d1913e7ae1d6a87b2f493dd47a15",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 31380,
-        "status": 1,
-        "language": "en",
-        "authors": [
-            "NivinCNC"
-        ],
-        "tvTypes": [
-            "Movie",
-            "TvSeries"
-        ],
-        "version": 4,
-        "internalName": "Watch32",
-        "description": "Watch32 is a Free Movies streaming site with over 10000 movies and TV-Series.",
-        "url": "https://raw.githubusercontent.com/Alla183/CNCVerse-Cloud-Stream-Extension/builds/Watch32.cs3",
-        "name": "Watch32"
-    },
-    {
         "iconUrl": "https://play-lh.googleusercontent.com/zVq_wAus2snoO-ggyI6IomlsCzfybAozQOGYpBrv71r1--rOYOYWsr_N7DWwVp9t7ro=s248-rw",
-        "fileHash": "sha256-7a4a01c764893548475971eb3d9a8c0f2e2415350c46b113323c0ff0070f4f3f",
+        "fileHash": "sha256-0965aa7bdc3fa49062b164a9aa938c99cf0125e75d4aa35dba8b18d2576dea45",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 43587,
+        "fileSize": 44023,
         "status": 1,
         "language": "ta",
         "authors": [
