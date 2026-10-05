@@ -230,14 +230,6 @@ class HDrezkaProvider : MainAPI() {
             response.url
         )
     }
-    
-
-    private fun isAnubisChallenge(html: String): Boolean {
-        return html.contains(
-            "anubis_challenge",
-            ignoreCase = true
-        ) || html.contains("не бот")
-    }
 
     private val ANUBIS_SCRIPT = Regex(
         """<script[^>]*id=["']anubis_challenge["'][^>]*>([\s\S]*?)</script>""",
