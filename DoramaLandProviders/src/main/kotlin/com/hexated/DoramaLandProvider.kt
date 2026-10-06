@@ -179,21 +179,15 @@ class DoramaLandProvider : MainAPI() {
             ?.let { Score.from10(it) }   // 🔥 ВАЖЛИВО
 
         // 🎬 TRAILER
-        var trailer = doc
-    
+
+        val trailer = doc
             .selectFirst("[data-modal-open-iframe]")
             ?.attr("data-modal-open-iframe")
-            ?.trim()
-
-        if (!trailer.isNullOrEmpty()) {
-            if (trailer.startsWith("//")) {
-                trailer = "https:$trailer"
-            }
-
-            println("🎬 TRAILER: $trailer")
-        } else {
-            println("❌ TRAILER NOT FOUND")
+            ?.let {
+                if (it.startsWith("//")) "https:$it" else it
         }
+
+        println("🎬 TRAILER: $trailer")
 
         // 🔗 RELATED
         val related = doc.select(".related-serials .catalog-item").mapNotNull { el ->
@@ -321,8 +315,8 @@ class DoramaLandProvider : MainAPI() {
                 this.tags = genres
                 this.score = score
 
-                if (!trailer.isNullOrEmpty()) {
-                    this.trailerUrl = trailer
+                trailer?.let {
+                    addTrailer(it)
                 }
             }
         }
@@ -336,8 +330,8 @@ class DoramaLandProvider : MainAPI() {
             this.recommendations = related + recommendations
             this.score = score
 
-            if (!trailer.isNullOrEmpty()) {
-                this.trailerUrl = trailer
+            trailer?.let {
+                addTrailer(it)
             }
         }
     }
