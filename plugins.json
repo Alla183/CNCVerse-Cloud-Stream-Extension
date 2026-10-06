@@ -314,6 +314,27 @@
         "name": "TamilUltraProvider"
     },
     {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=teleportal.ua&sz=%size%",
+        "fileHash": "sha256-4cee6934943f380802b2ee88c14ca06d162e8fc72d2404a221a39415f99a7c20",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
+        "fileSize": 30076,
+        "status": 1,
+        "language": "uk",
+        "authors": [
+            "CakesTwix"
+        ],
+        "tvTypes": [
+            "Series",
+            "Movie"
+        ],
+        "version": 7,
+        "internalName": "TeleportalProvider",
+        "description": "Telepotral - \u0421\u0435\u0440\u0456\u0430\u043b\u0438. \u0448\u043e\u0443, \u0414\u043e\u043a. \u0444\u0456\u043b\u044c\u043c\u0438",
+        "url": "https://raw.githubusercontent.com/Alla183/CNCVerse-Cloud-Stream-Extension/builds/TeleportalProvider.cs3",
+        "name": "TeleportalProvider"
+    },
+    {
         "iconUrl": "https://play-lh.googleusercontent.com/zVq_wAus2snoO-ggyI6IomlsCzfybAozQOGYpBrv71r1--rOYOYWsr_N7DWwVp9t7ro=s248-rw",
         "fileHash": "sha256-0965aa7bdc3fa49062b164a9aa938c99cf0125e75d4aa35dba8b18d2576dea45",
         "apiVersion": 1,
