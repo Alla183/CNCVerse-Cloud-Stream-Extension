@@ -180,16 +180,61 @@ class DoramaLandProvider : MainAPI() {
             ?.let { Score.from10(it) }   // 🔥 ВАЖЛИВО
 
         // 🎬 TRAILER
+        var trailer: String? = null
 
-        val trailer = doc
+        val trailerIframe = doc
             .selectFirst("[data-modal-open-iframe]")
             ?.attr("data-modal-open-iframe")
-            ?.let {
-                if (it.startsWith("//")) "https:$it" else it
+            ?.trim()
+
+        if (!trailerIframe.isNullOrEmpty()) {
+
+  
+            val trailerUrl = if (trailerIframe.startsWith("//")) {
+                "https:$trailerIframe"
+            } else {
+                trailerIframe
+            }
+
+   
+            println("🎬 TRAILER IFRAME: $trailerUrl")
+
+    
+            try {
+                val trailerDoc = app.get(
+                    trailerUrl,
+                    headers = mapOf(
+                        "Referer" to mainUrl,
+                        "User-Agent" to USER_AGENT
+                    )
+                ).document
+
+        // Варіант 1 — playlist <a href="...m3u8">
+     
+                trailer = trailerDoc
+                    .selectFirst(".fp-playlist a[href$=.m3u8]")
+                    ?.attr("href")
+                    ?.trim()
+
+        // Варіант 2 — data-config
+                if (trailer.isNullOrEmpty()) {
+                    val config = trailerDoc
+                        .selectFirst("[data-config]")
+                        ?.attr("data-config")
+
+                    if (!config.isNullOrEmpty()) {
+                        val json = JSONObject(config)
+                        trailer = json.optString("hls").takeIf { it.isNotEmpty() }
+                    }
+                }
+
+        
+                println("🎬 TRAILER HLS: $trailer")
+            } catch (e: Exception) {
+                println("❌ TRAILER ERROR: ${e.message}")
+            }
         }
-
-        println("🎬 TRAILER: $trailer")
-
+        
         // 🔗 RELATED
         val related = doc.select(".related-serials .catalog-item").mapNotNull { el ->
             val href = el.selectFirst("a")?.attr("href") ?: return@mapNotNull null
@@ -317,6 +362,7 @@ class DoramaLandProvider : MainAPI() {
                 this.score = score
 
                 trailer?.let {
+                    println("🎬 ADD TRAILER: $it")
                     addTrailer(it)
                 }
             }
@@ -332,6 +378,7 @@ class DoramaLandProvider : MainAPI() {
             this.score = score
 
             trailer?.let {
+                println("🎬 ADD TRAILER: $it")
                 addTrailer(it)
             }
         }
