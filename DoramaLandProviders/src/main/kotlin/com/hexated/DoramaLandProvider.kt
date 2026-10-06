@@ -322,7 +322,7 @@ class DoramaLandProvider : MainAPI() {
                 this.score = score
 
                 if (!trailer.isNullOrEmpty()) {
-                    addTrailer(trailer)
+                    this.trailerUrl = trailer
                 }
             }
         }
@@ -337,7 +337,7 @@ class DoramaLandProvider : MainAPI() {
             this.score = score
 
             if (!trailer.isNullOrEmpty()) {
-                addTrailer(trailer)
+                this.trailerUrl = trailer
             }
         }
     }
