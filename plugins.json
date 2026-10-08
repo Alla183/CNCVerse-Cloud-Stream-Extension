@@ -334,24 +334,5 @@
         "description": "Xon Provider for Anime and Cartoons - Tamil, Hindi, Telugu, English, Japanese",
         "url": "https://raw.githubusercontent.com/Alla183/CNCVerse-Cloud-Stream-Extension/builds/XonProvider.cs3",
         "name": "XonProvider"
-    },
-    {
-        "iconUrl": "https://site.yummyani.me/favicon.ico",
-        "fileHash": "sha256-d1b725e3ee173cdafd40ce8d67183f0a3d4f59c4063b39ec775e2c232d7170ce",
-        "apiVersion": 1,
-        "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 27750,
-        "status": 1,
-        "language": "ru",
-        "authors": [
-            "Alla183"
-        ],
-        "tvTypes": [
-            "Anime"
-        ],
-        "version": 17,
-        "internalName": "YummyAnimeProvider",
-        "url": "https://raw.githubusercontent.com/Alla183/CNCVerse-Cloud-Stream-Extension/builds/YummyAnimeProvider.cs3",
-        "name": "YummyAnimeProvider"
     }
 ]
