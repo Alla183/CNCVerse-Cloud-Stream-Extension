@@ -294,179 +294,665 @@ class YummyAnimeProvider : MainAPI() {
     }
 
     suspend fun extractKodikVideos(iframeUrl: String): List<Pair<String, String>> {
+        println("KODIK IFRAME: $iframeUrl")
 
-        println("IFRAME: $iframeUrl")
-        showToast("fetch iframe")
-
-        val page = app.get(iframeUrl).text
-
-        println("PAGE SIZE: ${page.length}")
-
-        val type = extractAfter(page, "vInfo.type =")
-        val hash = extractAfter(page, "vInfo.hash =")
-        val id = extractAfter(page, "vInfo.id =")
-        val rawParams = extractAfter(page, "var urlParams =")
-
-        println("TYPE: $type")
-        println("HASH: $hash")
-        println("ID: $id")
-
-        if (type == null || hash == null || id == null) {
-            showToast("❌ context parse fail")
-            return emptyList()
+        val fullUrl = when {
+            iframeUrl.startsWith("//") -> "https:$iframeUrl"
+            iframeUrl.startsWith("http") -> iframeUrl
+            else -> "https://$iframeUrl"
         }
 
-        val params = try {
-            JSONObject(rawParams!!)
-        } catch (e: Exception) {
-            println("PARAMS PARSE ERROR: ${e.message}")
-            showToast("❌ params error")
-            return emptyList()
-        }
+        try {
+        // 1. Сначала открываем iframe и сохраняем cookies
+            val iframeResponse = app.get(
+                fullUrl,
+                headers = mapOf(
+                    "Referer" to "https://yani.tv/",
+                    "User-Agent" to USER_AGENT,
+                    "Accept-Language" to "ru-RU,ru;q=0.9,en;q=0.8"
+                )
+            )
 
-        val endpoint = detectEndpoint(page) ?: "/ftor"
+            val page = iframeResponse.text
 
-        println("ENDPOINT: $endpoint")
-        showToast("endpoint: $endpoint")
+            println("KODIK PAGE SIZE: ${page.length}")
 
-        val body = FormBody.Builder()
-            .add("hash", hash)
-            .add("id", id)
-            .add("type", type)
-            .add("d", params.optString("d"))
-            .add("d_sign", params.optString("d_sign"))
-            .add("pd", params.optString("pd"))
-            .add("pd_sign", params.optString("pd_sign"))
-            .add("ref", Uri.decode(params.optString("ref")))
-            .add("ref_sign", params.optString("ref_sign"))
-            .add("bad_user", "true")
-            .add("cdn_is_working", "true")
-            .build()
+        // Cookies, которые Kodik выдаёт при открытии iframe
+            val cookies = iframeResponse.cookies.entries.joinToString("; ") {
+                "${it.key}=${it.value}"
+            }
 
-        val hosts = listOf(
-            "https://kodik.cc",
-            "https://kodik.info",
-            "https://kodik.biz",
-            "https://kodikapi.com"
-        )
+            println("KODIK COOKIES: ${cookies.take(200)}")
 
-        var linkJsonText: String? = null
+        // Убираем переносы для более стабильного поиска
+            val flat = page
+                .replace("\n", "")
+                .replace("\r", "")
 
-        for (host in hosts) {
-            try {
-                val testUrl = "$host$endpoint"
-                println("TRY HOST: $testUrl")
-                showToast("host: $host")
+        // 2. Получаем urlParams
+            val rawParams = Regex(
+                """\burlParams\s*=\s*'([^']+)'"""
+            ).find(flat)?.groupValues?.get(1)
 
-                val res = app.post(
-                    url = testUrl,
-                    requestBody = body
-                ).text
+            if (rawParams == null) {
+                println("❌ urlParams not found")
+                showToast("❌ urlParams not found")
+          
+                return emptyList()
+      
+            }
 
-                if (res.trim().startsWith("{")) {
-                    println("✅ SUCCESS HOST: $host")
-                    linkJsonText = res
-                    break
-                }
-
+      
+            val params = try {
+         
+                JSONObject(rawParams)
+    
             } catch (e: Exception) {
-                println("❌ FAIL HOST: $host ${e.message}")
-            }
-        }
         
-        if (linkJsonText == null) {
-            showToast("❌ all hosts failed")
-            return emptyList()
-        }
-
-        println("KODIK RESPONSE: ${linkJsonText.take(300)}")
-
-        val json = JSONObject(linkJsonText)
-        val links = json.optJSONObject("links")
-
-        if (links == null) {
-            showToast("❌ no links")
-            return emptyList()
-        }
-
-        val result = mutableListOf<Pair<String, String>>()
-
-        links.keys().forEach { quality ->
-            val arr = links.optJSONArray(quality) ?: return@forEach
-
-            println("QUALITY: $quality COUNT: ${arr.length()}")
-
-            for (i in 0 until arr.length()) {
-                val src = arr.getJSONObject(i).optString("src")
-
-                println("ENCODED SRC: ${src.take(50)}")
-
-                val decoded = decodeKodik(src)
-            
-                if (decoded == null) {
-                    println("❌ decode fail")
-                    continue
-                }
-                
-                println("✅ DECODED: $decoded")
-
-                result.add(decoded to quality)
+                println("❌ urlParams JSON error: ${e.message}")
+         
+                showToast("❌ params error")
+         
+                return emptyList()
+     
             }
+
+        // 3. YummyTV поддерживает и videoInfo, и vInfo
+      
+            val type = Regex(
+         
+                """\b(?:videoInfo|vInfo)\.type\s*=\s*'([^']+)'"""
+      
+            ).find(flat)?.groupValues?.get(1)
+
+      
+            val hash = Regex(
+          
+                """\b(?:videoInfo|vInfo)\.hash\s*=\s*'([^']+)'"""
+      
+            ).find(flat)?.groupValues?.get(1)
+
+      
+            val id = Regex(
+        
+                """\b(?:videoInfo|vInfo)\.id\s*=\s*'([^']+)'"""
+      
+            ).find(flat)?.groupValues?.get(1)
+
+      
+            println("TYPE: $type")
+     
+            println("HASH: $hash")
+     
+            println("ID: $id")
+
+    
+            if (type == null || hash == null || id == null) {
+         
+                println("❌ Kodik video context not found")
+          
+                showToast("❌ context parse fail")
+         
+                return emptyList()
+    
+            }
+
+        // 4. Находим player_single*.js
+     
+            val playerSrc = Regex(
+          
+                """src="((?://[^"]+)?/assets/js/app\.player_single[^"]+)"""
+     
+            ).find(flat)?.groupValues?.get(1)
+
+     
+            if (playerSrc == null) {
+         
+                println("❌ player_single.js not found")
+          
+                showToast("❌ player js not found")
+           
+                return emptyList()
+       
+            }
+
+       
+            val urlOrigin = fullUrl.let { url ->
+          
+                val schemeEnd = url.indexOf("://")
+
+          
+                if (schemeEnd >= 0) {
+              
+                    val afterScheme = url.substring(schemeEnd + 3)
+               
+                    val slashIdx = afterScheme.indexOf('/')
+
+             
+                    if (slashIdx >= 0) {
+                
+                        url.substring(0, schemeEnd + 3 + slashIdx)
+              
+                    } else {
+                  
+                        url
+              
+                    }
+         
+                } else {
+               
+                    url
+           
+                }
+       
+            }
+
+      
+            val playerScriptUrl = when {
+          
+                playerSrc.startsWith("//") -> "https:$playerSrc"
+          
+                playerSrc.startsWith("/") -> "$urlOrigin$playerSrc"
+           
+                else -> playerSrc
+    
+            }
+
+    
+            println("PLAYER JS: $playerScriptUrl")
+
+        // 5. Загружаем JS-файл
+      
+            val playerScript = app.get(
+          
+                playerScriptUrl,
+         
+                headers = mapOf(
+              
+                    "Referer" to fullUrl,
+               
+                    "User-Agent" to USER_AGENT,
+               
+                    "Accept-Language" to "ru-RU,ru;q=0.9,en;q=0.8"
+          
+                )
+      
+            ).text
+
+        // 6. Endpoint находится внутри atob("...")
+      
+            val endpointPath = Regex(
+           
+                """atob\("([A-Za-z0-9+/=]+)"\)"""
+      
+            ).findAll(playerScript)
+          
+                .mapNotNull { match ->
+              
+                    try {
+                 
+                        val decoded = base64Decode(
+                    
+                            match.groupValues[1]
+                 
+                        )
+
+                  
+                        decoded?.takeIf {
+                    
+                            it.startsWith("/") &&
+                      
+                            !it.startsWith("//") &&
+                       
+                            it.length <= 10
+                 
+                        }
+               
+                    } catch (_: Exception) {
+                 
+                        null
+              
+                    }
+           
+                }
+          
+                .firstOrNull()
+          
+            ?: "/ftor"
+
+      
+            println("KODIK ENDPOINT: $endpointPath")
+
+     
+            val origin = playerScriptUrl.substringBefore("/assets/js/")
+      
+            val endpointUrl = "$origin$endpointPath"
+
+      
+            println("KODIK POST URL: $endpointUrl")
+
+        // 7. ВАЖНО:
+        // ref уже URL-encoded внутри urlParams.
+        // НЕ используем Uri.decode().
+   
+            val body = FormBody.Builder()
+           
+                .add("d", params.optString("d"))
+          
+                .add("d_sign", params.optString("d_sign"))
+           
+                .add("pd", params.optString("pd"))
+           
+                .add("pd_sign", params.optString("pd_sign"))
+            
+                .add("ref", params.optString("ref"))
+          
+                .add("ref_sign", params.optString("ref_sign"))
+         
+                .add("bad_user", "true")
+         
+                .add("cdn_is_working", "true")
+         
+                .add("type", type)
+          
+                .add("hash", hash)
+          
+                .add("id", id)
+          
+                .add("info", "{}")
+          
+                .build()
+
+        // 8. POST на Kodik
+    
+            val response = app.post(
+         
+                url = endpointUrl,
+          
+                headers = mapOf(
+             
+                    "Referer" to fullUrl,
+               
+                    "User-Agent" to USER_AGENT,
+              
+                    "X-Requested-With" to "XMLHttpRequest",
+             
+                    "Cookie" to cookies,
+               
+                    "Accept" to "application/json, text/javascript, */*; q=0.01"
+         
+                ),
+         
+                requestBody = body
+      
+            )
+
+       
+            val responseText = response.text
+
+      
+            println(
+          
+                "KODIK RESPONSE: ${responseText.take(500)}"
+    
+            )
+
+     
+            if (!responseText.trim().startsWith("{")) {
+          
+                println("❌ Kodik returned non-JSON")
+           
+                showToast("❌ Kodik response error")
+           
+                return emptyList()
+      
+            }
+
+        // 9. Разбираем links
+      
+            val json = JSONObject(responseText)
+       
+            val links = json.optJSONObject("links")
+
+       
+            if (links == null) {
+         
+                println("❌ links object not found")
+           
+                showToast("❌ no links")
+            
+                return emptyList()
+      
+            }
+
+     
+            val result = mutableListOf<Pair<String, String>>()
+
+        // Порядок качества
+      
+            val qualityOrder = listOf(
+          
+                "2160",
+          
+                "1440",
+          
+                "1080",
+        
+                "720",
+         
+                "480",
+           
+                "360",
+           
+                "240"
+      
+            )
+
+     
+            for (quality in qualityOrder) {
+         
+                val array = links.optJSONArray(quality)
+                    ?: continue
+
+          
+                for (i in 0 until array.length()) {
+               
+                    val item = array.optJSONObject(i)
+                        ?: continue
+
+              
+                    val src = item.optString("src")
+                
+                        .takeIf { it.isNotBlank() }
+                        ?: continue
+
+               
+                    println(
+                   
+                        "KODIK SRC [$quality]: ${src.take(100)}"
+             
+                    )
+
+               
+                    val decoded = decodeKodik(src)
+                        ?: continue
+
+               
+                    println(
+                  
+                        "KODIK DECODED [$quality]: ${decoded.take(150)}"
+               
+                    )
+
+              
+                    result.add(decoded to quality)
+           
+                }
+        
+            }
+
+        // Если качество пришло нестандартное
+    
+            links.keys().forEach { quality ->
+            
+                if (quality in qualityOrder) return@forEach
+
+          
+                val array = links.optJSONArray(quality)
+                    ?: return@forEach
+
+          
+                for (i in 0 until array.length()) {
+              
+                    val item = array.optJSONObject(i)
+                        ?: continue
+
+               
+                    val src = item.optString("src")
+                   
+                        .takeIf { it.isNotBlank() }
+                        ?: continue
+
+              
+                    val decoded = decodeKodik(src)
+                        ?: continue
+
+             
+                    result.add(decoded to quality)
+            
+                }
+    
+            }
+
+    
+            println("KODIK EXTRACTED: ${result.size}")
+
+       
+            return result
+
+  
+        } catch (e: Exception) {
+      
+            e.printStackTrace()
+       
+            println("❌ KODIK EXTRACT ERROR: ${e.message}")
+       
+            showToast("❌ Kodik extractor error")
+       
+            return emptyList()
+   
         }
 
-        return result
     }
+
+
+/**
+ * Kodik src:
+ * ROT18 -> Base64
+ */
 
     fun decodeKodik(input: String): String? {
 
-        if (input.startsWith("http")) return input
+   
+        if (
+    
+            input.startsWith("http://") ||
+       
+                input.startsWith("https://")
+   
+        ) {
+       
+            return input
+  
+        }
 
-        for (shift in 0..25) {
-            val shifted = input.map {
-                when (it) {
-                    in 'a'..'z' -> 'a' + (it - 'a' + shift) % 26
-                    in 'A'..'Z' -> 'A' + (it - 'A' + shift) % 26
-                    else -> it
+  
+        return try {
+        // YummyTV использует именно ROT18
+       
+            val rotated = input.map { c ->
+           
+                if (c.isLetter()) {
+               
+                    val shifted = c.code + 18
+               
+                    val limit = if (c <= 'Z') 90 else 122
+
+              
+                    if (shifted <= limit) {
+                  
+                        shifted.toChar()
+               
+                    } else {
+                  
+                        (shifted - 26).toChar()
+               
+                    }
+         
+                } else {
+               
+                    c
+           
                 }
+     
             }.joinToString("")
 
-            val decoded = base64Decode(shifted)
+        
+            val decoded = base64Decode(rotated)
 
-            if (decoded != null) {
-                println("TRY SHIFT $shift -> ${decoded.take(50)}")
-
-                if (decoded.startsWith("http") || decoded.contains("m3u8")) {
-                    showToast("✅ video decoded")
-                    return decoded
-                }
+        
+            if (
+         
+                decoded != null &&
+        
+                    (
+               
+                        decoded.startsWith("http://") ||
+                
+                            decoded.startsWith("https://") ||
+                
+                            decoded.contains(".m3u8")
+           
+                    )
+     
+            ) {
+          
+                return decoded
+       
             }
-        }
 
-        showToast("❌ decode fail")
-        return null
-    }
-    
-    fun base64Decode(str: String): String? {
-        return try {
-            val pad = "=".repeat((4 - str.length % 4) % 4)
-            String(Base64.decode(str + pad, Base64.DEFAULT))
-        } catch (e: Exception) {
+       
             null
+
+   
+        } catch (e: Exception) {
+      
+            println("KODIK DECODE ERROR: ${e.message}")
+       
+            null
+  
         }
+
     }
 
-    fun extractAfter(text: String, key: String): String? {
-        val i = text.indexOf(key)
-        if (i == -1) return null
 
-        val start = text.indexOfAny(charArrayOf('"', '\''), i)
-        val end = text.indexOf(text[start], start + 1)
 
-        return text.substring(start + 1, end)
+    fun base64Decode(str: String): String? {
+   
+        return try {
+       
+            val padded = str +
+            
+            "=".repeat((4 - str.length % 4) % 4)
+
+        
+            String(
+            
+                Base64.decode(
+               
+                    padded,
+               
+                    Base64.DEFAULT
+            
+                )
+       
+            )
+  
+        } catch (e: Exception) {
+      
+            null
+   
+        }
+
     }
+
+
+/**
+ * Оставляем для совместимости с остальным кодом плагина.
+ */
+
+    fun extractAfter(
+   
+        text: String,
+   
+        key: String
+
+    ): String? {
+    
+        val index = text.indexOf(key)
+
+    
+        if (index == -1) {
+       
+            return null
+  
+        }
+
+  
+        val start = text.indexOfAny(
+      
+            charArrayOf('"', '\''),
+       
+            index
+   
+        )
+
+  
+        if (start == -1) {
+        
+            return null
+  
+        }
+
+  
+        val quote = text[start]
+
+   
+        val end = text.indexOf(
+     
+            quote,
+      
+            start + 1
+ 
+        )
+
+    
+        if (end == -1) {
+     
+            return null
+ 
+        }
+
+  
+        return text.substring(
+     
+            start + 1,
+       
+            end
+    
+        )
+
+    }
+
+
+/**
+ * Старый вариант оставляем как fallback.
+ */
 
     fun detectEndpoint(page: String): String? {
-        val match = Regex("""url:atob\(["'](.*?)["']\)""").find(page)
-        return match?.groupValues?.get(1)?.let { base64Decode(it) }
+
+   
+        val match = Regex(
+       
+            """url:atob\(["'](.*?)["']\)"""
+  
+        ).find(page)
+
+   
+        return match
+            ?.groupValues
+            ?.get(1)
+            ?.let { base64Decode(it) }
+
     }
 }
