@@ -684,7 +684,8 @@ class YummyAnimeProvider : MainAPI() {
             val responseText = response.text
 
        
-            println("KODIK HTTP STATUS: ${response.statusCode}")
+            println("KODIK RESPONSE SIZE: ${response.text.length}")
+            println("KODIK RESPONSE: ${response.text.take(1000)}")
       
             println("KODIK RESPONSE SIZE: ${responseText.length}")
       
@@ -710,7 +711,8 @@ class YummyAnimeProvider : MainAPI() {
          
                 println("❌ KODIK returned non-JSON")
            
-                println("❌ STATUS: ${response.statusCode}")
+                println("❌ STATUS: ${response.text.length}")
+                println("KODIK RESPONSE: ${response.text.take(1000)}")
           
                 println("❌ BODY: ${trimmed.take(2000)}")
 
