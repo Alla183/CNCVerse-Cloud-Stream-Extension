@@ -692,7 +692,7 @@ class YummyAnimeProvider : MainAPI() {
           
                 "KODIK RESPONSE: ${
               
-                responseText.take(1000)
+                    responseText.take(1000)
             
                 }"
       
@@ -715,11 +715,7 @@ class YummyAnimeProvider : MainAPI() {
                 println("❌ BODY: ${trimmed.take(2000)}")
 
            
-                showToast(
-            
-                "❌ Kodik response ${response.statusCode}"
-           
-                )
+                showToast("❌ Kodik response error")
 
            
                 return emptyList()
