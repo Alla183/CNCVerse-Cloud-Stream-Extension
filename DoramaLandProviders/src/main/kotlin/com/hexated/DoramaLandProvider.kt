@@ -4,6 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 import org.json.JSONObject
+import org.jsoup.Jsoup
 import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.M3u8Helper
@@ -438,6 +439,31 @@ class DoramaLandProvider : MainAPI() {
                             "User-Agent" to USER_AGENT
                         )
                     ).text
+
+                    // 📝 SUBTITLES
+                    val iframeDoc = Jsoup.parse(iframeHtml)
+
+                    val subtitleLanguages = listOf(
+                        "ru" to "Russian",
+                        "ua" to "Ukrainian",
+                        "kg" to "Kyrgyz"
+                    )
+
+                    subtitleLanguages.forEach { (code, language) ->
+
+                        val subtitleUrl = iframeDoc
+                            .selectFirst("[data-${code}_subtitle]")
+                            ?.attr("data-${code}_subtitle")
+                            ?.trim()
+                        if (!subtitleUrl.isNullOrEmpty() &&
+                            subtitleUrl.startsWith("http")) {
+                            println("📝 SUBTITLE: $language → $subtitleUrl")
+        
+                            subtitleCallback(
+                                SubtitleFile(language, subtitleUrl)
+                            )
+                        }
+                    }
 
                     val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
                         .find(iframeHtml)
