@@ -442,50 +442,31 @@ class DoramaLandProvider : MainAPI() {
 
                     // 📝 SUBTITLES
                     val iframeDoc = Jsoup.parse(iframeHtml)
+// 🎬 Знаходимо той самий блок відеоплеєра
+                    val videoPlayer = iframeDoc.selectFirst("div[id^=videoplayer]")
+                    if (videoPlayer != null) {
+    // 📝 СУБТИТРИ З ТОГО Ж DIV
+                        val subtitles = listOf(
+                            "ru" to "Russian",
+                            "ua" to "Ukrainian",
+                            "kg" to "Kyrgyz"
+                        )
 
-                    val subtitleLanguages = listOf(
-                        "ru" to "Russian",
-                        "ua" to "Ukrainian",
-                        "kg" to "Kyrgyz"
-                    )
+                        subtitles.forEach { (code, language) ->
 
-                    println("📝 CHECK SUBTITLES")
-                    println("HTML contains ru: ${iframeHtml.contains("data-ru_subtitle")}")
-                    println("HTML contains ua: ${iframeHtml.contains("data-ua_subtitle")}")
+                            val subtitleUrl = videoPlayer
+                               .attr("data-${code}_subtitle")
+                               .trim()
 
-                    subtitleLanguages.forEach { (code, language) ->
-    // Варіант 1 — через Jsoup
-                        var subtitleUrl = iframeDoc
-                            .selectFirst("[data-${code}_subtitle]")
-                            ?.attr("data-${code}_subtitle")
-                            ?.trim()
-
-    // Варіант 2 — через Regex
-                        if (subtitleUrl.isNullOrEmpty()) {
-                            subtitleUrl = Regex(
-                                """data-${code}_subtitle\s*=\s*\\?["']([^"']+)"""
-                            )
-                                .find(iframeHtml)
-                                ?.groupValues
-                                ?.getOrNull(1)
-                        }
-
-                        subtitleUrl = subtitleUrl
-                            ?.replace("\\/", "/")
-                            ?.replace("&amp;", "&")
-                            ?.trim()
-
-                        if (!subtitleUrl.isNullOrEmpty() &&
-                            subtitleUrl.startsWith("http")) {
-
-                            println("✅ SUBTITLE FOUND: $language → $subtitleUrl")
-
+                            if (subtitleUrl.isNotEmpty()) {
+                                println("✅ SUBTITLE: $language → $subtitleUrl")
                             subtitleCallback(
                                 SubtitleFile(language, subtitleUrl)
-                            )
-                        } else {
-                            println("❌ SUBTITLE NOT FOUND: $language")
+                                )
+                            }
                         }
+                    } else {
+                        println("❌ VIDEO PLAYER DIV NOT FOUND")
                     }
 
                     val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
