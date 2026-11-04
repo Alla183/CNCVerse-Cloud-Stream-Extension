@@ -85,10 +85,10 @@
     },
     {
         "iconUrl": "https://dorama.land/favicon.ico",
-        "fileHash": "sha256-97bffc100a2b939a842ac9b0bb9e0e0c726adb9e8a665cf4dd0fe49535b5f38a",
+        "fileHash": "sha256-96442d913fcdbf90026ef9bf2e78032c6ae2f9a5359f5f101ef72225336a889b",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 28298,
+        "fileSize": 27953,
         "status": 1,
         "language": "uk",
         "authors": [
