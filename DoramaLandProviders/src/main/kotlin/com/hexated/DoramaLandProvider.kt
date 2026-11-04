@@ -442,31 +442,30 @@ class DoramaLandProvider : MainAPI() {
 
                     // 📝 SUBTITLES
                     val iframeDoc = Jsoup.parse(iframeHtml)
-// 🎬 Знаходимо той самий блок відеоплеєра
                     val videoPlayer = iframeDoc.selectFirst("div[id^=videoplayer]")
                     if (videoPlayer != null) {
-    // 📝 СУБТИТРИ З ТОГО Ж DIV
                         val subtitles = listOf(
                             "ru" to "Russian",
                             "ua" to "Ukrainian",
                             "kg" to "Kyrgyz"
                         )
-
                         subtitles.forEach { (code, language) ->
+                             val link = videoPlayer
+                                 .attr("data-${code}_subtitle")
+                                 .trim()
 
-                            val subtitleUrl = videoPlayer
-                               .attr("data-${code}_subtitle")
-                               .trim()
-
-                            if (subtitleUrl.isNotEmpty()) {
-                                println("✅ SUBTITLE: $language → $subtitleUrl")
-                            subtitleCallback(
-                                SubtitleFile(language, subtitleUrl)
-                                )
-                            }
+                             if (link.isNotEmpty()) {
+                                 println("📝 SUBTITLE: $language → $link")
+                                 subtitleCallback.invoke(
+                                     newSubtitleFile(
+                                         getLanguage(language),
+                                         link
+                                     )
+                                 )
+                             }
                         }
                     } else {
-                        println("❌ VIDEO PLAYER DIV NOT FOUND")
+                        println("❌ VIDEO PLAYER NOT FOUND")
                     }
 
                     val m3u8 = Regex("""https:\\/\\/[^"]+\.m3u8""")
