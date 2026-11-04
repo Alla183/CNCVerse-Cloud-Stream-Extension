@@ -457,8 +457,7 @@ class DoramaLandProvider : MainAPI() {
                              if (link.isNotEmpty()) {
                                  println("📝 SUBTITLE: $language → $link")
                                  subtitleCallback.invoke(
-                                     newSubtitleFile(
-                                         getLanguage(language),
+                                     newSubtitleFile(language),
                                          link
                                      )
                                  )
