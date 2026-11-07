@@ -337,10 +337,10 @@
     },
     {
         "iconUrl": "https://site.yummyani.me/favicon.ico",
-        "fileHash": "sha256-2760a0844788b8e0c38168bba47d79e2e67c8867d1e6478fc757111ca229f513",
+        "fileHash": "sha256-ef7e543fcf4c7c75d5b11d79f837a02c362bb88912fe6997fe656ddde476cb72",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 41122,
+        "fileSize": 41082,
         "status": 1,
         "language": "ru",
         "authors": [
@@ -349,7 +349,7 @@
         "tvTypes": [
             "Anime"
         ],
-        "version": 22,
+        "version": 21,
         "internalName": "YummyAnimeProvider",
         "url": "https://raw.githubusercontent.com/Alla183/CNCVerse-Cloud-Stream-Extension/builds/YummyAnimeProvider.cs3",
         "name": "YummyAnimeProvider"
