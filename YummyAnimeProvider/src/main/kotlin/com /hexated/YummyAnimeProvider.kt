@@ -233,8 +233,10 @@ class YummyAnimeProvider : MainAPI() {
             showToast("❌ data без '|': $data")
             return false
         }
-        val animeUrl = parts[0]
+                // data може містити повний URL — беремо лише slug
+        val animeUrl = parts[0].substringBefore("?").trimEnd('/').substringAfterLast("/")
         val wantedKey = parts[1].epKey()
+        println("YUMMY LINKS slug=$animeUrl key=$wantedKey")
 
         val body = app.get(
             "https://api.yani.tv/anime/$animeUrl?need_videos=true",
