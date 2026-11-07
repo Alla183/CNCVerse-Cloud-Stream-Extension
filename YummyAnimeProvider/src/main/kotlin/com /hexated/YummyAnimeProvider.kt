@@ -160,7 +160,7 @@ class YummyAnimeProvider : MainAPI() {
             "Lang" to "ru"
         )
 
-        val json = JSONObject(app.get(apiUrl, headers).toString())
+        val json = JSONObject(app.get(apiUrl, headers = headers).text)
         val response = json.optJSONObject("response")
 
         val videos = response?.optJSONArray("videos")
@@ -172,15 +172,16 @@ class YummyAnimeProvider : MainAPI() {
             for (i in 0 until videos.length()) {
                 val obj = videos.optJSONObject(i) ?: continue
 
-                val number = obj.optString("number") ?: continue
-
-                if (number in seen) continue
-                seen.add(number)
+                val number = obj.optString("number").trim()
+                if (number.isEmpty() || number == "-") continue
+                val key = number.trimStart('0').ifEmpty { number }.lowercase()
+                if (key in seen) continue
+                seen.add(key)
 
                 episodes.add(
-                    newEpisode("$animeUrl|$number") {
-                    name = "Серія $number"
-                    episode = number.toFloatOrNull()?.toInt()
+                    newEpisode("$animeUrl|$key") {
+                        name = "Серія $key"
+                        episode = key.toFloatOrNull()?.toInt()
                     }
                 )
             }
