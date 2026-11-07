@@ -337,10 +337,10 @@
     },
     {
         "iconUrl": "https://site.yummyani.me/favicon.ico",
-        "fileHash": "sha256-9427b65e1c4b41be028f639bf850a527b41f0cb6aa2d39faf99c71eee6c1b566",
+        "fileHash": "sha256-248ae90ff63182851a32b9c9ca01d86ffc7422d8f890d16551ce3f5cb70a90d1",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/Alla183/CNCVerse-Cloud-Stream-Extension",
-        "fileSize": 40111,
+        "fileSize": 41122,
         "status": 1,
         "language": "ru",
         "authors": [
