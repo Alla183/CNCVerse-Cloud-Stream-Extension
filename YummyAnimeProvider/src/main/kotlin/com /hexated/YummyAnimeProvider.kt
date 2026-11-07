@@ -205,6 +205,26 @@ class YummyAnimeProvider : MainAPI() {
             }
         }
 
+                // Рекомендації
+        val recommendations = doc.select("div.recommend-block div.anime-column").mapNotNull { el ->
+            val href = el.selectFirst("a.image-block")?.attr("href") ?: return@mapNotNull null
+            val slug = href.substringBefore("?").trimEnd('/').substringAfterLast("/")
+            if (slug.isBlank()) return@mapNotNull null
+
+            val recTitle = el.selectFirst("a.anime-title")?.text()?.trim()
+                ?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val recPoster = el.selectFirst("img")?.attr("src").orEmpty()
+
+            newAnimeSearchResponse(
+                recTitle,
+                "https://site.yummyani.me/catalog/item/$slug",
+                TvType.Anime
+            ) {
+                posterUrl = if (recPoster.startsWith("//")) "https:$recPoster" else recPoster
+            }
+        }
+        println("YUMMY RECOMMENDATIONS: ${recommendations.size}")
+
         return newAnimeLoadResponse(
             title,
             url,
@@ -212,6 +232,7 @@ class YummyAnimeProvider : MainAPI() {
         ) {
             posterUrl = fixUrl(poster)
             this.plot = plot
+            this.recommendations = recommendations
 
         // 🔥 ВАЖЛИВО: саме так CloudStream очікує episodes
             this.episodes = mutableMapOf(
