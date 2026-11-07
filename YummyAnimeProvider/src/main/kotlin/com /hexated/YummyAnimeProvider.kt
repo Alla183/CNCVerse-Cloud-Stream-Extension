@@ -22,32 +22,50 @@ class YummyAnimeProvider : MainAPI() {
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Anime)
 
+        // =========================
+    // 🔥 Головна сторінка (розділи)
     // =========================
-    // 🔥 Головна сторінка
-    // =========================
+
+    // База для каталогу. Якщо розділи порожні на site.* — змінити на "https://old.yummyani.me"
+    private val catalogBase = "https://old.yummyani.me"
+
+    override val mainPage = mainPageOf(
+        "/catalog" to "Усі аніме",
+        "/catalog/ongoing" to "Онґоїнги",
+        "/catalog/announcement" to "Анонси",
+        "/catalog/category/komediya" to "Комедії",
+        "/catalog/category/romantika" to "Романтика",
+        "/catalog/category/fentezi" to "Фентезі",
+        "/catalog/category/priklyucheniya" to "Пригоди",
+        "/catalog/category/detektiv" to "Детектив"
+    )
+
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val url = "$mainUrl/catalog?page=$page"
+        val url = "$catalogBase${request.data}?page=$page"
         val doc = app.get(url).document
 
         val list = doc.select("div.anime-column").mapNotNull { element ->
-            val link = element.selectFirst("a.image-block")?.attr("href") ?: return@mapNotNull null
+            val href = element.selectFirst("a.image-block")?.attr("href") ?: return@mapNotNull null
+            val slug = href.substringBefore("?").trimEnd('/').substringAfterLast("/")
+            if (slug.isBlank()) return@mapNotNull null
+
             val poster = element.selectFirst("img")?.attr("src") ?: ""
             val title = element.selectFirst(".anime-title")?.text() ?: return@mapNotNull null
 
             newAnimeSearchResponse(
                 title,
-                mainUrl + link,
+                "https://site.yummyani.me/catalog/item/$slug",
                 TvType.Anime
             ) {
-                posterUrl = fixUrl(poster)
+                posterUrl = if (poster.startsWith("//")) "https:$poster" else fixUrl(poster)
             }
         }
 
         return newHomePageResponse(
-            listOf(HomePageList("Усі аніме", list)),
+            listOf(HomePageList(request.name, list)),
             list.isNotEmpty()
         )
     }
