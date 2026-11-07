@@ -217,48 +217,68 @@ class YummyAnimeProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        println("YUMMY LINKS data=$data")
         val parts = data.split("|", limit = 2)
-        if (parts.size < 2) return false
+        if (parts.size < 2) {
+            showToast("❌ data без '|': $data")
+            return false
+        }
         val animeUrl = parts[0]
-        val number = parts[1]
+        val wantedKey = parts[1].epKey()
 
         val body = app.get(
             "https://api.yani.tv/anime/$animeUrl?need_videos=true",
             headers = apiHeaders
         ).text
-        val videos = JSONObject(body).optJSONObject("response")?.optJSONArray("videos")
-            ?: return false
+        println("YUMMY LINKS api len=${body.length} head=${body.take(300)}")
+
+        val arr = JSONObject(body).optJSONObject("response")?.optJSONArray("videos")
+        if (arr == null) {
+            showToast("❌ API: немає videos")
+            return false
+        }
+
+        val all = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+        println("YUMMY LINKS numbers=${all.map { it.optString("number") }.distinct().take(30)}")
+
+        val items = all
+            .filter { it.optString("number").epKey() == wantedKey }
+            .filter { it.optString("iframe_url").isNotBlank() }
+
+        showToast("Відео: всього ${all.size}, для серії '$wantedKey': ${items.size}")
+        items.forEach {
+            println("YUMMY ITEM player=${it.optJSONObject("data")?.optString("player")} iframe=${it.optString("iframe_url")}")
+        }
 
         var found = false
-
-        for (i in 0 until videos.length()) {
-            val v = videos.optJSONObject(i) ?: continue
-            if (v.optString("number") != number) continue
-
-            var iframe = v.optString("iframe_url")
-            if (iframe.isBlank()) continue
-            if (iframe.startsWith("//")) iframe = "https:$iframe"
-
+        items.forEach { v ->
+            val iframe = v.optString("iframe_url").trim()
             val info = v.optJSONObject("data")
             val player = info?.optString("player").orEmpty()
-            val dubbing = info?.optString("dubbing").orEmpty()
-            val label = listOf(player, dubbing)
-                .filter { it.isNotBlank() }
-                .joinToString(" · ")
-                .ifBlank { name }
+                .removePrefix("Плеер ").removePrefix("Player ").trim()
+            val dubbing = info?.optString("dubbing").orEmpty().trim()
+            val label = listOf(player, dubbing).filter { it.isNotBlank() }
+                .joinToString(" · ").ifBlank { name }
 
             try {
-                val ok = if (iframe.contains("kodik", ignoreCase = true)) {
-                    invokeKodik(iframe, label, callback)
-                } else {
-                    loadExtractor(iframe, "$mainUrl/", subtitleCallback, callback)
+                val ok = when {
+                    iframe.contains("kodik", true) -> invokeKodik(iframe, label, callback)
+                    iframe.contains("iframecvh", true) || player.equals("cvh", true) ->
+                        invokeCvh(iframe, label, callback)
+                    iframe.contains("aksor.tv", true) -> invokeAksor(iframe, label, callback)
+                    iframe.contains("sibnet.ru", true) -> invokeSibnet(iframe, label, callback)
+                    iframe.contains("rutube.ru", true) -> invokeRutube(iframe, label, callback)
+                    else -> loadExtractor(iframe.fixProto(), "https://yani.tv/", subtitleCallback, callback)
                 }
+                println("YUMMY RESULT [$label] ok=$ok iframe=$iframe")
                 if (ok) found = true
             } catch (e: Exception) {
-                println("YUMMY LINKS ERROR [$label]: ${e.message}")
+                println("YUMMY LINKS ERROR [$label]: ${e::class.java.simpleName}: ${e.message}")
+                showToast("❌ $label: ${e.message?.take(60)}")
             }
         }
 
+        showToast(if (found) "✅ Посилання знайдено" else "❌ Жодного посилання")
         return found
     }
 
