@@ -211,6 +211,16 @@ class YummyAnimeProvider : MainAPI() {
         "Lang" to "ru"
     )
 
+    private val kodikEndpointCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    private fun String.epKey() = trim().trimStart('0').ifEmpty { trim() }.lowercase()
+
+    private fun String.fixProto() = when {
+        startsWith("//") -> "https:$this"
+        startsWith("http") -> this
+        else -> "https://$this"
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -288,43 +298,45 @@ class YummyAnimeProvider : MainAPI() {
         label: String,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val host = "https://" + java.net.URI(iframe).host
-        val page = app.get(iframe, referer = "$mainUrl/").text
+        val fullUrl = iframe.fixProto()
+        val page = app.get(fullUrl, referer = "https://yani.tv/")
+        val flat = page.text.replace("\n", "").replace("\r", "")
 
-        val paramsJson = Regex("""urlParams\s*=\s*['"]?(\{.*?\})['"]?\s*;""")
-            .find(page)?.groupValues?.get(1) ?: return false
-        val params = JSONObject(paramsJson)
+        val urlParamsStr = Regex("""\burlParams\s*=\s*'([^']+)'""").find(flat)?.groupValues?.get(1) ?: return false
+        val type = Regex("""\b(?:videoInfo|vInfo)\.type\s*=\s*'([^']+)'""").find(flat)?.groupValues?.get(1) ?: return false
+        val hash = Regex("""\b(?:videoInfo|vInfo)\.hash\s*=\s*'([^']+)'""").find(flat)?.groupValues?.get(1) ?: return false
+        val id = Regex("""\b(?:videoInfo|vInfo)\.id\s*=\s*'([^']+)'""").find(flat)?.groupValues?.get(1) ?: return false
+        val playerSrc = Regex("""src="((?://[^"]+)?/assets/js/app\.player_single[^"]+)"""")
+            .find(flat)?.groupValues?.get(1) ?: return false
 
-        val type = Regex("""videoInfo\.type\s*=\s*['"](.*?)['"]""").find(page)?.groupValues?.get(1)
-            ?: return false
-        val hash = Regex("""videoInfo\.hash\s*=\s*['"](.*?)['"]""").find(page)?.groupValues?.get(1)
-            ?: return false
-        val id = Regex("""videoInfo\.id\s*=\s*['"](.*?)['"]""").find(page)?.groupValues?.get(1)
-            ?: return false
+        val pageOrigin = "https://" + java.net.URI(fullUrl).host
+        val scriptUrl = when {
+            playerSrc.startsWith("//") -> "https:$playerSrc"
+            playerSrc.startsWith("/") -> pageOrigin + playerSrc
+            else -> playerSrc
+        }
+        val origin = scriptUrl.substringBefore("/assets/js/")
 
-        // Шлях POST-ендпоінта Kodik змінюється — беремо його зі скрипта плеєра
-        var ftorPath = "/ftor"
-        try {
-            val scriptPath = Regex("""src="(/assets/js/app\.player_single[^"]+)"""")
-                .find(page)?.groupValues?.get(1)
-            if (scriptPath != null) {
-                val js = app.get(host + scriptPath, referer = iframe).text
-                val enc = Regex("""url:\s*atob\(["'](.*?)["']\)""").find(js)?.groupValues?.get(1)
-                if (enc != null) {
-                    ftorPath = String(Base64.decode(enc, Base64.DEFAULT))
-                }
-            }
-        } catch (_: Exception) { }
+        val endpointPath = kodikEndpointCache[scriptUrl] ?: run {
+            val js = app.get(scriptUrl, referer = fullUrl).text
+            Regex("""atob\("([A-Za-z0-9+/=]+)"\)""").findAll(js).mapNotNull { m ->
+                try {
+                    val d = String(Base64.decode(m.groupValues[1], Base64.DEFAULT))
+                    d.takeIf { it.startsWith("/") && !it.startsWith("//") && it.length <= 10 }
+                } catch (_: Exception) { null }
+            }.firstOrNull()?.also { kodikEndpointCache[scriptUrl] = it }
+        } ?: "/ftor"
 
+        val p = JSONObject(urlParamsStr)
         val res = app.post(
-            host + ftorPath,
+            origin + endpointPath,
             data = mapOf(
-                "d" to params.optString("d"),
-                "d_sign" to params.optString("d_sign"),
-                "pd" to params.optString("pd"),
-                "pd_sign" to params.optString("pd_sign"),
-                "ref" to params.optString("ref"),
-                "ref_sign" to params.optString("ref_sign"),
+                "d" to p.optString("d"),
+                "d_sign" to p.optString("d_sign"),
+                "pd" to p.optString("pd"),
+                "pd_sign" to p.optString("pd_sign"),
+                "ref" to java.net.URLDecoder.decode(p.optString("ref"), "UTF-8"),
+                "ref_sign" to p.optString("ref_sign"),
                 "bad_user" to "true",
                 "cdn_is_working" to "true",
                 "type" to type,
@@ -332,28 +344,36 @@ class YummyAnimeProvider : MainAPI() {
                 "id" to id,
                 "info" to "{}"
             ),
-            referer = iframe,
-            headers = mapOf("X-Requested-With" to "XMLHttpRequest")
+            referer = fullUrl,
+            headers = mapOf("X-Requested-With" to "XMLHttpRequest"),
+            cookies = page.cookies
         ).text
+        println("YUMMY KODIK res head=${res.take(200)}")
 
-        val links = JSONObject(res).optJSONObject("links") ?: return false
+        val links = JSONObject(res).optJSONObject("links")
+        if (links == null) {
+            kodikEndpointCache.remove(scriptUrl)
+            return false
+        }
+
         var any = false
+        for (q in listOf(240, 360, 480, 720, 1080)) {
+            val src = links.optJSONArray(q.toString())?.optJSONObject(0)?.optString("src")
+                ?.takeIf { it.isNotEmpty() } ?: continue
+            var url = (if (src.contains("//")) src else decodeKodikSrc(src) ?: continue).fixProto()
 
-        for (q in links.keys()) {
-            val arr = links.optJSONArray(q) ?: continue
-            val src = arr.optJSONObject(0)?.optString("src") ?: continue
-            var url = kodikDecode(src) ?: continue
-            if (url.startsWith("//")) url = "https:$url"
+            val m = Regex("""/(\d+)\.mp4:hls:manifest\.m3u8""").find(url)
+            val actual = m?.groupValues?.get(1)?.toIntOrNull()
+            if (m != null && actual != null && actual < q) {
+                val repaired = url.replaceRange(m.range, "/$q.mp4:hls:manifest.m3u8")
+                val ok = try { app.head(repaired).isSuccessful } catch (_: Exception) { false }
+                if (ok) url = repaired
+            }
 
             callback(
-                newExtractorLink(
-                    source = label,
-                    name = label,
-                    url = url,
-                    type = ExtractorLinkType.M3U8
-                ) {
-                    this.referer = "$host/"
-                    this.quality = q.toIntOrNull() ?: Qualities.Unknown.value
+                newExtractorLink(label, label, url, ExtractorLinkType.M3U8) {
+                    this.referer = ""
+                    this.quality = q
                 }
             )
             any = true
@@ -361,26 +381,182 @@ class YummyAnimeProvider : MainAPI() {
         return any
     }
 
-    // Kodik кодує посилання ROT-N + base64 (N невідомий, тому перебираємо)
-    private fun kodikDecode(src: String): String? {
-        if (src.startsWith("http") || src.startsWith("//")) return src
-        for (shift in 0..25) {
-            val rotated = src.map { c ->
-                when (c) {
-                    in 'a'..'z' -> 'a' + (c - 'a' + shift) % 26
-                    in 'A'..'Z' -> 'A' + (c - 'A' + shift) % 26
-                    else -> c
-                }
-            }.joinToString("")
-            val padded = rotated + "=".repeat((4 - rotated.length % 4) % 4)
-            val decoded = try {
-                String(Base64.decode(padded, Base64.DEFAULT))
-            } catch (e: Exception) {
-                continue
-            }
-            if (decoded.startsWith("http") || decoded.startsWith("//")) return decoded
+    private fun decodeKodikSrc(src: String): String? = try {
+        val rotated = src.map { c ->
+            if (c.isLetter()) {
+                val shifted = c.code + 18
+                val limit = if (c <= 'Z') 90 else 122
+                if (shifted <= limit) shifted.toChar() else (shifted - 26).toChar()
+            } else c
+        }.joinToString("")
+        val padded = rotated + "=".repeat((4 - rotated.length % 4) % 4)
+        String(Base64.decode(padded, Base64.DEFAULT))
+    } catch (_: Exception) { null }
+
+    // ---------- CVH (cdnvideohub) ----------
+    private suspend fun invokeCvh(
+        iframe: String,
+        label: String,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val query = iframe.fixProto().substringAfter("?", "")
+        val params = query.split("&").mapNotNull {
+            val i = it.indexOf('=')
+            if (i < 0) null else it.substring(0, i) to java.net.URLDecoder.decode(it.substring(i + 1), "UTF-8")
+        }.toMap()
+
+        val animeId = params["anime_id"] ?: return false
+        val episodeNum = params["episode"]?.toIntOrNull() ?: 1
+        val dubbingCode = params["dubbing_code"].orEmpty()
+        val dubbingLabel = (params["dubbing"].orEmpty()).removePrefix("Озвучка ").trim()
+
+        val hdr = mapOf("Referer" to "https://ru.yummyani.me/", "Accept" to "application/json")
+        val playlist = JSONObject(
+            app.get(
+                "https://plapi.cdnvideohub.com/api/v1/player/sv/playlist?pub=745&id=$animeId&aggr=mali",
+                headers = hdr
+            ).text
+        )
+        val arr = playlist.optJSONArray("items") ?: return false
+        val isSerial = playlist.optBoolean("isSerial", true)
+
+        fun JSONObject.str(k: String) = if (isNull(k)) "" else optString(k)
+
+        val all = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+        val candidates = if (!isSerial) all else all.filter {
+            it.isNull("episode") || it.optInt("episode") == episodeNum
         }
-        return null
+        fun eq(a: String, b: String) = b.isNotBlank() && a.equals(b, true)
+
+        val item = candidates.firstOrNull { eq(it.str("voiceStudio"), dubbingCode) }
+            ?: candidates.firstOrNull { eq("${it.str("voiceType")} ${it.str("voiceStudio")}".trim(), dubbingLabel) }
+            ?: candidates.firstOrNull { eq(it.str("voiceStudio"), dubbingLabel) }
+            ?: candidates.firstOrNull()
+            ?: return false
+
+        val vkId = item.str("vkId")
+        if (vkId.isEmpty()) return false
+        val video = JSONObject(
+            app.get("https://plapi.cdnvideohub.com/api/v1/player/sv/video/$vkId", headers = hdr).text
+        )
+        val failover = video.str("failoverHost").removePrefix("https://").removePrefix("http://")
+            .trimEnd('/')
+        val sources = video.optJSONObject("sources") ?: return false
+
+        fun fixHost(u: String): String {
+            if (failover.isBlank()) return u
+            return u.replace(Regex("""^(https?://)(\d{1,3}(?:\.\d{1,3}){3})""")) {
+                it.groupValues[1] + failover
+            }
+        }
+
+        val map = listOf(
+            240 to "mpegLowestUrl", 360 to "mpegLowUrl", 480 to "mpegMediumUrl",
+            720 to "mpegHighUrl", 1080 to "mpegFullHdUrl", 1440 to "mpegQhdUrl", 2160 to "mpeg4kUrl"
+        )
+        var any = false
+        for ((q, key) in map) {
+            var u = sources.str(key)
+            if (u.isBlank() && q == 1440) u = sources.str("mpeg2kUrl")
+            if (u.isBlank()) continue
+            callback(
+                newExtractorLink(label, label, fixHost(u), ExtractorLinkType.VIDEO) {
+                    this.quality = q
+                }
+            )
+            any = true
+        }
+        return any
+    }
+
+    // ---------- Aksor ----------
+    private suspend fun invokeAksor(
+        iframe: String,
+        label: String,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val playerUrl = iframe.fixProto()
+        val segs = java.net.URI(playerUrl).path.trim('/').split('/').filter { it.isNotBlank() }
+        val vi = segs.indexOf("video")
+        val hash = (if (vi >= 0) segs.getOrNull(vi + 1) else segs.lastOrNull()) ?: return false
+
+        val json = JSONObject(
+            app.get(
+                "https://player.aksor.tv/api/video/$hash",
+                headers = mapOf("Accept" to "application/json"),
+                referer = playerUrl
+            ).text
+        )
+        val qs = json.optJSONObject("qualities") ?: return false
+
+        var any = false
+        for ((key, q) in listOf("q360" to 360, "q480" to 480, "q720" to 720, "q1080" to 1080, "q2k" to 1440, "q4k" to 2160)) {
+            val u = qs.optString(key).trim()
+            if (u.isEmpty() || u.equals("null", true)) continue
+            callback(
+                newExtractorLink(label, label, u.replace(" ", "%20")) {
+                    this.referer = playerUrl
+                    this.quality = q
+                }
+            )
+            any = true
+        }
+        return any
+    }
+
+    // ---------- Sibnet ----------
+    private suspend fun invokeSibnet(
+        iframe: String,
+        label: String,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val playerUrl = iframe.fixProto()
+        val html = app.get(playerUrl, referer = "https://yani.tv/").text
+        val raw = listOf(
+            Regex("""player\.src\(\s*\[\s*\{\s*src\s*:\s*["']([^"']+)"""),
+            Regex("""<source[^>]+src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+        ).firstNotNullOfOrNull { it.find(html)?.groupValues?.get(1) } ?: return false
+
+        val path = raw.trim().replace("\\/", "/")
+        val url = if (path.startsWith("http") || path.startsWith("//")) path.fixProto()
+        else java.net.URL(java.net.URL(playerUrl), path).toString()
+
+        callback(
+            newExtractorLink(label, label, url, ExtractorLinkType.VIDEO) {
+                this.referer = playerUrl
+                this.headers = mapOf("Origin" to "https://video.sibnet.ru")
+                this.quality = Qualities.Unknown.value
+            }
+        )
+        return true
+    }
+
+    // ---------- Rutube ----------
+    private suspend fun invokeRutube(
+        iframe: String,
+        label: String,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val playerUrl = iframe.fixProto()
+        val id = Regex("""(?i)([a-f0-9]{32})""").find(playerUrl)?.groupValues?.get(1) ?: return false
+        val opts = JSONObject(
+            app.get(
+                "https://rutube.ru/api/play/options/$id/?no_404=true",
+                referer = playerUrl
+            ).text
+        )
+        val bal = opts.optJSONObject("video_balancer") ?: return false
+        val stream = listOf("m3u8", "default").firstNotNullOfOrNull { k ->
+            bal.optString(k).takeIf { !bal.isNull(k) && it.isNotBlank() && !it.equals("null", true) }
+        } ?: return false
+
+        callback(
+            newExtractorLink(label, label, stream, ExtractorLinkType.M3U8) {
+                this.referer = playerUrl
+                this.quality = Qualities.Unknown.value
+            }
+        )
+        return true
     }
 }
    
