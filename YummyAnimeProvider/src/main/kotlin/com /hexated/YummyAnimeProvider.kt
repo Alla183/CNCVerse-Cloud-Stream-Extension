@@ -27,7 +27,7 @@ class YummyAnimeProvider : MainAPI() {
     // =========================
 
     // База для каталогу. Якщо розділи порожні на site.* — змінити на "https://old.yummyani.me"
-    private val catalogBase = "https://old.yummyani.me"
+    private val catalogBase = "https://site.yummyani.me"
 
     override val mainPage = mainPageOf(
         "/catalog" to "Усі аніме",
